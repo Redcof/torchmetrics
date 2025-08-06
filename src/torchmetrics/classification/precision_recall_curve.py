@@ -181,6 +181,7 @@ class BinaryPrecisionRecallCurve(Metric):
         curve: Optional[Tuple[Tensor, Tensor, Tensor]] = None,
         score: Optional[Union[Tensor, bool]] = None,
         ax: Optional[_AX_TYPE] = None,
+        labels: Optional[list[str]] = None,
     ) -> _PLOT_OUT_TYPE:
         """Plot a single curve from the metric.
 
@@ -191,6 +192,7 @@ class BinaryPrecisionRecallCurve(Metric):
                 will automatically compute the score. The score is computed by using the trapezoidal rule to compute the
                 area under the curve.
             ax: An matplotlib axis object. If provided will add plot to that axis
+            labels: a list of strings, if provided will be added to the plot to indicate the different classes
 
         Returns:
             Figure and Axes object
@@ -221,7 +223,8 @@ class BinaryPrecisionRecallCurve(Metric):
             else None
         )
         return plot_curve(
-            curve_computed, score=score, ax=ax, label_names=("Recall", "Precision"), name=self.__class__.__name__
+            curve_computed, score=score, ax=ax, label_names=("Recall", "Precision"), name=self.__class__.__name__,
+            labels=labels,
         )
 
 
@@ -384,6 +387,7 @@ class MulticlassPrecisionRecallCurve(Metric):
         curve: Optional[Union[Tuple[Tensor, Tensor, Tensor], Tuple[List[Tensor], List[Tensor], List[Tensor]]]] = None,
         score: Optional[Union[Tensor, bool]] = None,
         ax: Optional[_AX_TYPE] = None,
+        labels: Optional[list[str]] = None,
     ) -> _PLOT_OUT_TYPE:
         """Plot a single or multiple values from the metric.
 
@@ -394,6 +398,7 @@ class MulticlassPrecisionRecallCurve(Metric):
                 will automatically compute the score. The score is computed by using the trapezoidal rule to compute the
                 area under the curve.
             ax: An matplotlib axis object. If provided will add plot to that axis
+            labels: a list of strings, if provided will be added to the plot to indicate the different classes
 
         Returns:
             Figure and Axes object
@@ -423,7 +428,8 @@ class MulticlassPrecisionRecallCurve(Metric):
             else None
         )
         return plot_curve(
-            curve_computed, score=score, ax=ax, label_names=("Recall", "Precision"), name=self.__class__.__name__
+            curve_computed, score=score, ax=ax, label_names=("Recall", "Precision"), name=self.__class__.__name__,
+            labels=labels,
         )
 
 
@@ -580,6 +586,7 @@ class MultilabelPrecisionRecallCurve(Metric):
         curve: Optional[Union[Tuple[Tensor, Tensor, Tensor], Tuple[List[Tensor], List[Tensor], List[Tensor]]]] = None,
         score: Optional[Union[Tensor, bool]] = None,
         ax: Optional[_AX_TYPE] = None,
+        labels: Optional[list[str]] = None,
     ) -> _PLOT_OUT_TYPE:
         """Plot a single or multiple values from the metric.
 
@@ -590,6 +597,7 @@ class MultilabelPrecisionRecallCurve(Metric):
                 will automatically compute the score. The score is computed by using the trapezoidal rule to compute the
                 area under the curve.
             ax: An matplotlib axis object. If provided will add plot to that axis
+            labels: a list of strings, if provided will be added to the plot to indicate the different classes
 
         Returns:
             Figure and Axes object
@@ -619,7 +627,8 @@ class MultilabelPrecisionRecallCurve(Metric):
             else None
         )
         return plot_curve(
-            curve_computed, score=score, ax=ax, label_names=("Recall", "Precision"), name=self.__class__.__name__
+            curve_computed, score=score, ax=ax, label_names=("Recall", "Precision"), name=self.__class__.__name__,
+            labels=labels,
         )
 
 
