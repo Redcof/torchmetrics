@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, List, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any, List, Optional, Union
 
 import torch
 from torch import Tensor
@@ -20,10 +21,10 @@ from torchmetrics.detection.helpers import _fix_empty_tensors, _input_validator
 from torchmetrics.functional.detection.iou import _iou_compute, _iou_update
 from torchmetrics.metric import Metric
 from torchmetrics.utilities.data import dim_zero_cat
-from torchmetrics.utilities.imports import _MATPLOTLIB_AVAILABLE, _TORCHVISION_GREATER_EQUAL_0_8
+from torchmetrics.utilities.imports import _MATPLOTLIB_AVAILABLE, _TORCHVISION_AVAILABLE
 from torchmetrics.utilities.plot import _AX_TYPE, _PLOT_OUT_TYPE
 
-if not _TORCHVISION_GREATER_EQUAL_0_8:
+if not _TORCHVISION_AVAILABLE:
     __doctest_skip__ = ["IntersectionOverUnion", "IntersectionOverUnion.plot"]
 elif not _MATPLOTLIB_AVAILABLE:
     __doctest_skip__ = ["IntersectionOverUnion.plot"]
@@ -132,6 +133,7 @@ class IntersectionOverUnion(Metric):
     full_state_update: bool = True
 
     groundtruth_labels: List[Tensor]
+    pred_labels: List[Tensor]
     iou_matrix: List[Tensor]
     _iou_type: str = "iou"
     _invalid_val: float = -1.0
@@ -146,10 +148,10 @@ class IntersectionOverUnion(Metric):
     ) -> None:
         super().__init__(**kwargs)
 
-        if not _TORCHVISION_GREATER_EQUAL_0_8:
+        if not _TORCHVISION_AVAILABLE:
             raise ModuleNotFoundError(
-                f"Metric `{self._iou_type.upper()}` requires that `torchvision` version 0.8.0 or newer is installed."
-                " Please install with `pip install torchvision>=0.8` or `pip install torchmetrics[detection]`."
+                f"Metric `{self._iou_type.upper()}` requires that `torchvision` is installed."
+                " Please install with `pip install torchmetrics[detection]`."
             )
 
         allowed_box_formats = ("xyxy", "xywh", "cxcywh")
@@ -168,6 +170,7 @@ class IntersectionOverUnion(Metric):
         self.respect_labels = respect_labels
 
         self.add_state("groundtruth_labels", default=[], dist_reduce_fx=None)
+        self.add_state("pred_labels", default=[], dist_reduce_fx=None)
         self.add_state("iou_matrix", default=[], dist_reduce_fx=None)
 
     @staticmethod
@@ -178,7 +181,7 @@ class IntersectionOverUnion(Metric):
     def _iou_compute_fn(*args: Any, **kwargs: Any) -> Tensor:
         return _iou_compute(*args, **kwargs)
 
-    def update(self, preds: List[Dict[str, Tensor]], target: List[Dict[str, Tensor]]) -> None:
+    def update(self, preds: list[dict[str, Tensor]], target: list[dict[str, Tensor]]) -> None:
         """Update state with predictions and targets."""
         _input_validator(preds, target, ignore_score=True)
 
@@ -186,6 +189,7 @@ class IntersectionOverUnion(Metric):
             det_boxes = self._get_safe_item_values(p_i["boxes"])
             gt_boxes = self._get_safe_item_values(t_i["boxes"])
             self.groundtruth_labels.append(t_i["labels"])
+            self.pred_labels.append(p_i["labels"])
 
             iou_matrix = self._iou_update_fn(det_boxes, gt_boxes, self.iou_threshold, self._invalid_val)  # N x M
             if self.respect_labels:
@@ -204,7 +208,7 @@ class IntersectionOverUnion(Metric):
             boxes = box_convert(boxes, in_fmt=self.box_format, out_fmt="xyxy")
         return boxes
 
-    def _get_gt_classes(self) -> List:
+    def _get_gt_classes(self) -> list:
         """Returns a list of unique classes found in ground truth and detection data."""
         if len(self.groundtruth_labels) > 0:
             return torch.cat(self.groundtruth_labels).unique().tolist()
@@ -212,20 +216,32 @@ class IntersectionOverUnion(Metric):
 
     def compute(self) -> dict:
         """Computes IoU based on inputs passed in to ``update`` previously."""
-        score = torch.cat([mat[mat != self._invalid_val] for mat in self.iou_matrix], 0).mean()
-        results: Dict[str, Tensor] = {f"{self._iou_type}": score}
+        # compute global IoU score using only valid values.
+        valid_matrices = [
+            mat[mat != self._invalid_val] for mat in self.iou_matrix if torch.any(mat != self._invalid_val)
+        ]
+        score = torch.cat(valid_matrices, 0).mean() if valid_matrices else torch.tensor(0.0, device=self.device)
+        results: dict[str, Tensor] = {f"{self._iou_type}": score}
         if torch.isnan(score):  # if no valid boxes are found
             results[f"{self._iou_type}"] = torch.tensor(0.0, device=score.device)
         if self.class_metrics:
-            gt_labels = dim_zero_cat(self.groundtruth_labels)
-            classes = gt_labels.unique().tolist() if len(gt_labels) > 0 else []
+            # union of ground truth and predicted labels
+            all_labels = dim_zero_cat([dim_zero_cat(self.groundtruth_labels), dim_zero_cat(self.pred_labels)])
+            classes = all_labels.unique().tolist() if all_labels.numel() > 0 else []
             for cl in classes:
-                masked_iou, observed = torch.zeros_like(score), torch.zeros_like(score)
+                masked_iou = torch.zeros_like(score)
+                observed = torch.zeros_like(score)
+
                 for mat, gt_lab in zip(self.iou_matrix, self.groundtruth_labels):
                     scores = mat[:, gt_lab == cl]
-                    masked_iou += scores[scores != self._invalid_val].sum()
-                    observed += scores[scores != self._invalid_val].numel()
-                results.update({f"{self._iou_type}/cl_{cl}": masked_iou / observed})
+                    valid_scores = scores[scores != self._invalid_val]
+                    masked_iou += valid_scores.sum()
+                    observed += valid_scores.numel()
+                # return 0.0 if no valid scores are observed.
+                if observed.item() == 0:
+                    results.update({f"{self._iou_type}/cl_{cl}": torch.tensor(0.0, device=score.device)})
+                else:
+                    results.update({f"{self._iou_type}/cl_{cl}": masked_iou / observed})
         return results
 
     def plot(

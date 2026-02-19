@@ -20,6 +20,7 @@ from scipy.special import expit as sigmoid
 from sklearn.metrics import coverage_error as sk_coverage_error
 from sklearn.metrics import label_ranking_average_precision_score as sk_label_ranking
 from sklearn.metrics import label_ranking_loss as sk_label_ranking_loss
+
 from torchmetrics.classification.ranking import (
     MultilabelCoverageError,
     MultilabelRankingAveragePrecision,
@@ -30,7 +31,7 @@ from torchmetrics.functional.classification.ranking import (
     multilabel_ranking_average_precision,
     multilabel_ranking_loss,
 )
-
+from torchmetrics.utilities.imports import _TORCH_GREATER_EQUAL_2_1
 from unittests import NUM_CLASSES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester, inject_ignore_index
@@ -53,7 +54,7 @@ def _reference_sklearn_ranking(preds, target, fn, ignore_index):
 
 
 @pytest.mark.parametrize(
-    "metric, functional_metric, ref_metric",
+    ("metric", "functional_metric", "ref_metric"),
     [
         (MultilabelCoverageError, multilabel_coverage_error, sk_coverage_error),
         (MultilabelRankingAveragePrecision, multilabel_ranking_average_precision, sk_label_ranking),
@@ -61,7 +62,7 @@ def _reference_sklearn_ranking(preds, target, fn, ignore_index):
     ],
 )
 @pytest.mark.parametrize(
-    "inputs", (_multilabel_cases[1], _multilabel_cases[2], _multilabel_cases[4], _multilabel_cases[5])
+    "inputs", [_multilabel_cases[1], _multilabel_cases[2], _multilabel_cases[4], _multilabel_cases[5]]
 )
 class TestMultilabelRanking(MetricTester):
     """Test class for `MultilabelRanking` metric."""
@@ -117,8 +118,8 @@ class TestMultilabelRanking(MetricTester):
     def test_multilabel_ranking_dtype_cpu(self, inputs, metric, functional_metric, ref_metric, dtype):
         """Test dtype support of the metric on CPU."""
         preds, target = inputs
-        if (preds < 0).any() and dtype == torch.half:
-            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision")
+        if not _TORCH_GREATER_EQUAL_2_1 and (preds < 0).any() and dtype == torch.half:
+            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision for torch<2.1")
         if dtype == torch.half and functional_metric == multilabel_ranking_average_precision:
             pytest.xfail(
                 reason="multilabel_ranking_average_precision requires torch.unique which is not implemented for half"

@@ -17,9 +17,9 @@ import numpy as np
 import pytest
 import torch
 from torch import Tensor
+
 from torchmetrics.audio import ScaleInvariantSignalDistortionRatio
 from torchmetrics.functional.audio import scale_invariant_signal_distortion_ratio
-
 from unittests import BATCH_SIZE, NUM_BATCHES, _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -84,7 +84,7 @@ def _reference_speechmetrics_si_sdr(preds: Tensor, target: Tensor, zero_mean: bo
 
 
 @pytest.mark.parametrize(
-    "preds, target, ref_metric, zero_mean",
+    ("preds", "target", "ref_metric", "zero_mean"),
     [
         (inputs.preds, inputs.target, partial(_reference_speechmetrics_si_sdr, zero_mean=True), True),
         (inputs.preds, inputs.target, partial(_reference_speechmetrics_si_sdr, zero_mean=False), False),

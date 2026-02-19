@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Tuple
 
 import torch
 from torch import Tensor
@@ -21,7 +20,7 @@ from torchmetrics.utilities.checks import _check_same_shape
 from torchmetrics.utilities.distributed import reduce
 
 
-def _ergas_update(preds: Tensor, target: Tensor) -> Tuple[Tensor, Tensor]:
+def _ergas_update(preds: Tensor, target: Tensor) -> tuple[Tensor, Tensor]:
     """Update and returns variables required to compute Erreur Relative Globale Adimensionnelle de Synthèse.
 
     Args:
@@ -37,8 +36,7 @@ def _ergas_update(preds: Tensor, target: Tensor) -> Tuple[Tensor, Tensor]:
     _check_same_shape(preds, target)
     if len(preds.shape) != 4:
         raise ValueError(
-            "Expected `preds` and `target` to have BxCxHxW shape."
-            f" Got preds: {preds.shape} and target: {target.shape}."
+            f"Expected `preds` and `target` to have BxCxHxW shape. Got preds: {preds.shape} and target: {target.shape}."
         )
     return preds, target
 

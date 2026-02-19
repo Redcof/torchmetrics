@@ -20,10 +20,10 @@ from scipy.special import expit as sigmoid
 from scipy.special import softmax
 from sklearn.metrics import hinge_loss as sk_hinge
 from sklearn.preprocessing import OneHotEncoder
+
 from torchmetrics.classification.hinge import BinaryHingeLoss, HingeLoss, MulticlassHingeLoss
 from torchmetrics.functional.classification.hinge import binary_hinge_loss, multiclass_hinge_loss
 from torchmetrics.metric import Metric
-
 from unittests import NUM_CLASSES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester, inject_ignore_index, remove_ignore_index
@@ -43,7 +43,7 @@ def _reference_sklearn_binary_hinge_loss(preds, target, ignore_index):
     return sk_hinge(target, preds)
 
 
-@pytest.mark.parametrize("inputs", (_binary_cases[1], _binary_cases[2], _binary_cases[4], _binary_cases[5]))
+@pytest.mark.parametrize("inputs", [_binary_cases[1], _binary_cases[2], _binary_cases[4], _binary_cases[5]])
 class TestBinaryHingeLoss(MetricTester):
     """Test class for `BinaryHingeLoss` metric."""
 
@@ -141,7 +141,7 @@ def _reference_sklearn_multiclass_hinge_loss(preds, target, multiclass_mode, ign
 
 
 @pytest.mark.parametrize(
-    "inputs", (_multiclass_cases[1], _multiclass_cases[2], _multiclass_cases[4], _multiclass_cases[5])
+    "inputs", [_multiclass_cases[1], _multiclass_cases[2], _multiclass_cases[4], _multiclass_cases[5]]
 )
 class TestMulticlassHingeLoss(MetricTester):
     """Test class for `MulticlassHingeLoss` metric."""

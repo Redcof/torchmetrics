@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any, Optional, Union
 
 from torch import Tensor, tensor
 
@@ -24,11 +25,10 @@ from torchmetrics.utilities.imports import (
     _GAMMATONE_AVAILABLE,
     _MATPLOTLIB_AVAILABLE,
     _TORCHAUDIO_AVAILABLE,
-    _TORCHAUDIO_GREATER_EQUAL_0_10,
 )
 from torchmetrics.utilities.plot import _AX_TYPE, _PLOT_OUT_TYPE
 
-if not all([_GAMMATONE_AVAILABLE, _TORCHAUDIO_AVAILABLE, _TORCHAUDIO_GREATER_EQUAL_0_10]):
+if not all([_GAMMATONE_AVAILABLE, _TORCHAUDIO_AVAILABLE]):
     __doctest_skip__ = ["SpeechReverberationModulationEnergyRatio", "SpeechReverberationModulationEnergyRatio.plot"]
 elif not _MATPLOTLIB_AVAILABLE:
     __doctest_skip__ = ["SpeechReverberationModulationEnergyRatio.plot"]
@@ -39,7 +39,7 @@ class SpeechReverberationModulationEnergyRatio(Metric):
 
     SRMR is a non-intrusive metric for speech quality and intelligibility based on
     a modulation spectral representation of the speech signal.
-    This code is translated from `SRMRToolbox`_ and `SRMRpy`_.
+    This code is translated from SRMRToolbox and `SRMRpy`_.
 
     As input to ``forward`` and ``update`` the metric accepts the following input
 
@@ -56,9 +56,9 @@ class SpeechReverberationModulationEnergyRatio(Metric):
 
     .. attention::
         This implementation is experimental, and might not be consistent with the matlab
-        implementation `SRMRToolbox`_, especially the fast implementation.
-        The slow versions, a) fast=False, norm=False, max_cf=128, b) fast=False, norm=True, max_cf=30, have
-        a relatively small inconsistence.
+        implementation SRMRToolbox, especially the fast implementation.
+        The slow versions, a) ``fast=False, norm=False, max_cf=128``, b) ``fast=False, norm=True, max_cf=30``,
+        have a relatively small inconsistency.
 
     Args:
         fs: the sampling rate
@@ -106,7 +106,7 @@ class SpeechReverberationModulationEnergyRatio(Metric):
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        if not _TORCHAUDIO_AVAILABLE or not _TORCHAUDIO_GREATER_EQUAL_0_10 or not _GAMMATONE_AVAILABLE:
+        if not _TORCHAUDIO_AVAILABLE or not _GAMMATONE_AVAILABLE:
             raise ModuleNotFoundError(
                 "speech_reverberation_modulation_energy_ratio requires you to have `gammatone` and"
                 " `torchaudio>=0.10` installed. Either install as ``pip install torchmetrics[audio]`` or "

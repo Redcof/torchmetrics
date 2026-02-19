@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import math
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import torch
 from torch import Tensor, tensor
@@ -23,7 +23,7 @@ from torchmetrics.utilities.checks import _check_same_shape
 from torchmetrics.utilities.distributed import reduce
 
 
-def _scc_update(preds: Tensor, target: Tensor, hp_filter: Tensor, window_size: int) -> Tuple[Tensor, Tensor, Tensor]:
+def _scc_update(preds: Tensor, target: Tensor, hp_filter: Tensor, window_size: int) -> tuple[Tensor, Tensor, Tensor]:
     """Update and returns variables required to compute Spatial Correlation Coefficient.
 
     Args:
@@ -73,7 +73,7 @@ def _scc_update(preds: Tensor, target: Tensor, hp_filter: Tensor, window_size: i
     return preds, target, hp_filter
 
 
-def _symmetric_reflect_pad_2d(input_img: Tensor, pad: Union[int, Tuple[int, ...]]) -> Tensor:
+def _symmetric_reflect_pad_2d(input_img: Tensor, pad: Union[int, tuple[int, ...]]) -> Tensor:
     """Applies symmetric padding to the 2D image tensor input using ``reflect`` mode (d c b a | a b c d | d c b a)."""
     if isinstance(pad, int):
         pad = (pad, pad, pad, pad)
@@ -91,10 +91,10 @@ def _symmetric_reflect_pad_2d(input_img: Tensor, pad: Union[int, Tuple[int, ...]
 
 def _signal_convolve_2d(input_img: Tensor, kernel: Tensor) -> Tensor:
     """Applies 2D signal convolution to the input tensor with the given kernel."""
-    left_padding = int(math.floor((kernel.size(3) - 1) / 2))
-    right_padding = int(math.ceil((kernel.size(3) - 1) / 2))
-    top_padding = int(math.floor((kernel.size(2) - 1) / 2))
-    bottom_padding = int(math.ceil((kernel.size(2) - 1) / 2))
+    left_padding = math.floor((kernel.size(3) - 1) / 2)
+    right_padding = math.ceil((kernel.size(3) - 1) / 2)
+    top_padding = math.floor((kernel.size(2) - 1) / 2)
+    bottom_padding = math.ceil((kernel.size(2) - 1) / 2)
 
     padded = _symmetric_reflect_pad_2d(input_img, pad=(left_padding, right_padding, top_padding, bottom_padding))
     kernel = kernel.flip([2, 3])
@@ -106,13 +106,13 @@ def _hp_2d_laplacian(input_img: Tensor, kernel: Tensor) -> Tensor:
     return _signal_convolve_2d(input_img, kernel) * 2.0
 
 
-def _local_variance_covariance(preds: Tensor, target: Tensor, window: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+def _local_variance_covariance(preds: Tensor, target: Tensor, window: Tensor) -> tuple[Tensor, Tensor, Tensor]:
     """Computes local variance and covariance of the input tensors."""
     # This code is inspired by
     # https://github.com/andrewekhalel/sewar/blob/master/sewar/full_ref.py#L187.
 
-    left_padding = int(math.ceil((window.size(3) - 1) / 2))
-    right_padding = int(math.floor((window.size(3) - 1) / 2))
+    left_padding = math.ceil((window.size(3) - 1) / 2)
+    right_padding = math.floor((window.size(3) - 1) / 2)
 
     preds = pad(preds, (left_padding, right_padding, left_padding, right_padding))
     target = pad(target, (left_padding, right_padding, left_padding, right_padding))

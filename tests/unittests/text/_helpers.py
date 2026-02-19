@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import pickle
-import sys
+from collections.abc import Sequence
 from functools import partial
-from typing import Any, Callable, Dict, Optional, Sequence, Union
+from typing import Any, Callable, Optional, Union
 
 import numpy as np
 import pytest
 import torch
 from torch import Tensor
-from torchmetrics import Metric
 
+from torchmetrics import Metric
 from unittests import NUM_PROCESSES, USE_PYTEST_POOL, _reference_cachier
-from unittests._helpers import seed_all
+from unittests._helpers import _IS_WINDOWS, seed_all
 from unittests._helpers.testers import (
     MetricTester,
     _assert_allclose,
@@ -47,7 +47,7 @@ def _assert_all_close_regardless_of_order(
     elif isinstance(pl_result, Sequence):
         for pl_res, ref_res in zip(pl_result, ref_result):
             _assert_allclose(pl_res, ref_res, atol=atol)
-    elif isinstance(pl_result, Dict):
+    elif isinstance(pl_result, dict):
         if key is None:
             raise KeyError("Provide Key for Dict based metric results.")
         assert np.allclose(
@@ -367,7 +367,7 @@ class TextTester(MetricTester):
             "key": key,
         }
         if ddp:
-            if sys.platform == "win32":
+            if _IS_WINDOWS:
                 pytest.skip("DDP not supported on windows")
             if not USE_PYTEST_POOL:
                 pytest.skip("DDP pool is not available.")

@@ -16,9 +16,9 @@ from functools import partial
 
 import pytest
 import torch
+
 from torchmetrics.functional.nominal.theils_u import theils_u, theils_u_matrix
 from torchmetrics.nominal import TheilsU
-
 from unittests import BATCH_SIZE, NUM_BATCHES, _Input
 from unittests._helpers.testers import MetricTester
 
@@ -43,7 +43,7 @@ _input_logits = _Input(
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def theils_u_matrix_input():
     """Define input in matrix format for the metric."""
     matrix = torch.cat(
@@ -88,14 +88,14 @@ def _reference_dython_theils_u_matrix(matrix, nan_strategy, nan_replace_value):
 
 
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [
         (_input_default.preds, _input_default.target),
         (_input_with_nans.preds, _input_with_nans.target),
         (_input_logits.preds, _input_logits.target),
     ],
 )
-@pytest.mark.parametrize("nan_strategy, nan_replace_value", [("replace", 0.0), ("drop", None)])
+@pytest.mark.parametrize(("nan_strategy", "nan_replace_value"), [("replace", 0.0), ("drop", None)])
 class TestTheilsU(MetricTester):
     """Test class for `TheilsU` metric."""
 

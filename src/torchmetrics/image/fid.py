@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from collections.abc import Sequence
 from copy import deepcopy
-from typing import Any, List, Optional, Sequence, Tuple, Union
+from typing import Any, Optional, Union
 
 import torch
 from torch import Tensor
@@ -44,11 +45,14 @@ else:
 class NoTrainInceptionV3(_FeatureExtractorInceptionV3):
     """Module that never leaves evaluation mode."""
 
+    INPUT_IMAGE_SIZE: int
+
     def __init__(
         self,
         name: str,
-        features_list: List[str],
+        features_list: list[str],
         feature_extractor_weights_path: Optional[str] = None,
+        antialias: bool = True,
     ) -> None:
         if not _TORCH_FIDELITY_AVAILABLE:
             raise ModuleNotFoundError(
@@ -57,6 +61,7 @@ class NoTrainInceptionV3(_FeatureExtractorInceptionV3):
             )
 
         super().__init__(name, features_list, feature_extractor_weights_path)
+        self.use_antialias = antialias
         # put into evaluation mode
         self.eval()
 
@@ -64,7 +69,7 @@ class NoTrainInceptionV3(_FeatureExtractorInceptionV3):
         """Force network to always be in evaluation mode."""
         return super().train(False)
 
-    def _torch_fidelity_forward(self, x: Tensor) -> Tuple[Tensor, ...]:
+    def _torch_fidelity_forward(self, x: Tensor) -> tuple[Tensor, ...]:
         """Forward method of inception net.
 
         Copy of the forward method from this file:
@@ -80,11 +85,21 @@ class NoTrainInceptionV3(_FeatureExtractorInceptionV3):
         remaining_features = self.features_list.copy()
 
         x = x.to(self._dtype) if hasattr(self, "_dtype") else x.to(torch.float)
-        x = interpolate_bilinear_2d_like_tensorflow1x(
-            x,
-            size=(self.INPUT_IMAGE_SIZE, self.INPUT_IMAGE_SIZE),
-            align_corners=False,
-        )
+        if self.use_antialias:
+            x = torch.nn.functional.interpolate(
+                x,
+                size=(self.INPUT_IMAGE_SIZE, self.INPUT_IMAGE_SIZE),
+                mode="bilinear",
+                align_corners=False,
+                antialias=True,
+            )
+        else:
+            x = interpolate_bilinear_2d_like_tensorflow1x(
+                x,
+                size=(self.INPUT_IMAGE_SIZE, self.INPUT_IMAGE_SIZE),
+                align_corners=False,
+            )
+
         x = (x - 128) / 128
 
         x = self.Conv2d_1a_3x3(x)
@@ -180,7 +195,7 @@ def _compute_fid(mu1: Tensor, sigma1: Tensor, mu2: Tensor, sigma2: Tensor) -> Te
 
 
 class FrechetInceptionDistance(Metric):
-    r"""Calculate Fréchet inception distance (FID_) which is used to access the quality of generated images.
+    r"""Calculate Fréchet inception distance (FID_) which is used to assess the quality of generated images.
 
     .. math::
         FID = \|\mu - \mu_w\|^2 + tr(\Sigma + \Sigma_w - 2(\Sigma \Sigma_w)^{\frac{1}{2}})
@@ -249,6 +264,9 @@ class FrechetInceptionDistance(Metric):
               - True: if input imgs are expected to be in the data type of torch.float32.
               - False: if input imgs are expected to be in the data type of torch.int8.
         input_img_size: tuple of integers. Indicates input img size to the custom feature extractor network if provided.
+        use_antialias: boolian flag to indicate whether to use antialiasing when resizing images. This will change the
+            resize function to use bilinear interpolation with antialiasing, which is different from the original
+            Inception v3 implementation. Does not apply to custom feature extractor networks.
         kwargs: Additional keyword arguments, see :ref:`Metric kwargs` for more info.
 
     Raises:
@@ -298,7 +316,9 @@ class FrechetInceptionDistance(Metric):
         feature: Union[int, Module] = 2048,
         reset_real_features: bool = True,
         normalize: bool = False,
-        input_img_size: Tuple[int, int, int] = (3, 299, 299),
+        input_img_size: tuple[int, int, int] = (3, 299, 299),
+        feature_extractor_weights_path: Optional[str] = None,
+        antialias: bool = True,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -307,6 +327,7 @@ class FrechetInceptionDistance(Metric):
             raise ValueError("Argument `normalize` expected to be a bool")
         self.normalize = normalize
         self.used_custom_model = False
+        antialias = antialias
 
         if isinstance(feature, int):
             num_features = feature
@@ -321,13 +342,23 @@ class FrechetInceptionDistance(Metric):
                     f"Integer input to argument `feature` must be one of {valid_int_input}, but got {feature}."
                 )
 
-            self.inception = NoTrainInceptionV3(name="inception-v3-compat", features_list=[str(feature)])
+            self.inception = NoTrainInceptionV3(
+                name="inception-v3-compat",
+                features_list=[str(feature)],
+                feature_extractor_weights_path=feature_extractor_weights_path,
+                antialias=antialias,
+            )
 
         elif isinstance(feature, Module):
             self.inception = feature
             self.used_custom_model = True
             if hasattr(self.inception, "num_features"):
-                num_features = self.inception.num_features
+                if isinstance(self.inception.num_features, int):
+                    num_features = self.inception.num_features
+                elif isinstance(self.inception.num_features, Tensor):
+                    num_features = int(self.inception.num_features.item())
+                else:
+                    raise TypeError("Expected `self.inception.num_features` to be of type int or Tensor.")
             else:
                 if self.normalize:
                     dummy_image = torch.rand(1, *input_img_size, dtype=torch.float32)

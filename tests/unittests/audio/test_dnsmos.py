@@ -13,12 +13,13 @@
 # limitations under the License.
 import os
 from functools import partial
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import numpy as np
 import pytest
 import torch
 from torch import Tensor
+
 from torchmetrics.audio.dnsmos import DeepNoiseSuppressionMeanOpinionScore
 from torchmetrics.functional.audio.dnsmos import (
     DNSMOS_DIR,
@@ -30,7 +31,6 @@ from torchmetrics.utilities.imports import (
     _ONNXRUNTIME_AVAILABLE,
     _REQUESTS_AVAILABLE,
 )
-
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
 
@@ -43,7 +43,7 @@ else:
     class InferenceSession:  # type:ignore
         """Dummy InferenceSession."""
 
-        def __init__(self, **kwargs: Dict[str, Any]) -> None: ...
+        def __init__(self, **kwargs: dict[str, Any]) -> None: ...
 
 
 SAMPLING_RATE = 16000
@@ -82,7 +82,7 @@ class _ComputeScore:
 
         return sig_poly, bak_poly, ovr_poly
 
-    def __call__(self, aud, input_fs, is_personalized) -> Dict[str, Any]:
+    def __call__(self, aud, input_fs, is_personalized) -> dict[str, Any]:
         fs = SAMPLING_RATE
         audio = librosa.resample(aud, orig_sr=input_fs, target_sr=fs) if input_fs != fs else aud
         actual_audio_len = len(audio)
@@ -143,7 +143,7 @@ def _reference_metric_batch(
     personalized: bool,
     device: Optional[str] = None,  # for tester
     reduce_mean: bool = False,
-    **kwargs: Dict[str, Any],  # for tester
+    **kwargs: dict[str, Any],  # for tester
 ):
     # download onnx first
     _load_session(f"{DNSMOS_DIR}/{'p' if personalized else ''}DNSMOS/sig_bak_ovr.onnx", torch.device("cpu"))
@@ -167,10 +167,10 @@ def _reference_metric_batch(
         # shape: preds [BATCH_SIZE, 1, Time] , target [BATCH_SIZE, 1, Time]
         # or shape: preds [NUM_BATCHES*BATCH_SIZE, 1, Time] , target [NUM_BATCHES*BATCH_SIZE, 1, Time]
         return score.mean(dim=0)
-    return score.reshape(*shape[:-1], 4).reshape(shape[:-1] + (4,)).numpy()
+    return score.reshape(*shape[:-1], 4).reshape((*shape[:-1], 4)).numpy()
 
 
-def _dnsmos_cheat(preds, target, **kwargs: Dict[str, Any]):
+def _dnsmos_cheat(preds, target, **kwargs: dict[str, Any]):
     # cheat the MetricTester as the deep_noise_suppression_mean_opinion_score doesn't need target
     return deep_noise_suppression_mean_opinion_score(preds, **kwargs)
 
@@ -185,7 +185,7 @@ preds = torch.rand(2, 2, 8000)
 
 
 @pytest.mark.parametrize(
-    "preds, fs, personalized",
+    ("preds", "fs", "personalized"),
     [
         (preds, 8000, False),
         (preds, 8000, True),
@@ -250,3 +250,22 @@ class TestDNSMOS(MetricTester):
             ),
             metric_args={"fs": fs, "personalized": personalized, "device": device},
         )
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="test requires cuda")
+def test_cache_arg():
+    """Test the cache_session argument.
+
+    If this is set to False, the onnx sessions should be not be cached.
+
+    """
+
+    def mem():
+        return torch.cuda.memory_allocated() / 1024**2
+
+    before_iter = mem()
+    for _ in range(5):
+        deep_noise_suppression_mean_opinion_score(
+            preds.to("cuda"), fs=16_000, personalized=False, device="cuda", cache_session=False
+        )
+        assert before_iter >= mem(), "memory increased too much above base level"

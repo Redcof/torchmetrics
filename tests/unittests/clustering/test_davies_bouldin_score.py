@@ -13,9 +13,9 @@
 # limitations under the License.
 import pytest
 from sklearn.metrics import davies_bouldin_score as sklearn_davies_bouldin_score
+
 from torchmetrics.clustering.davies_bouldin_score import DaviesBouldinScore
 from torchmetrics.functional.clustering.davies_bouldin_score import davies_bouldin_score
-
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
 from unittests.clustering._inputs import _single_target_intrinsic1, _single_target_intrinsic2
@@ -24,7 +24,7 @@ seed_all(42)
 
 
 @pytest.mark.parametrize(
-    "data, labels",
+    ("data", "labels"),
     [
         (_single_target_intrinsic1.data, _single_target_intrinsic1.labels),
         (_single_target_intrinsic2.data, _single_target_intrinsic2.labels),

@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 from sklearn.metrics import auc as _sk_auc
 from torch import Tensor, tensor
+
 from torchmetrics.utilities.compute import auc
 from unittests import NUM_BATCHES
 from unittests._helpers import seed_all
@@ -56,7 +57,7 @@ for batch_size in (8, 4049):
         _examples.append(_Input(x=tensor(x), y=tensor(y)))
 
 
-@pytest.mark.parametrize("x, y", _examples)
+@pytest.mark.parametrize(("x", "y"), _examples)
 class TestAUC(MetricTester):
     """Test class for `AUC`."""
 

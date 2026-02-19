@@ -20,10 +20,11 @@ import torch
 from scipy.special import expit as sigmoid
 from scipy.special import softmax
 from sklearn.metrics import roc_curve as sk_roc_curve
+
 from torchmetrics.classification.roc import ROC, BinaryROC, MulticlassROC, MultilabelROC
 from torchmetrics.functional.classification.roc import binary_roc, multiclass_roc, multilabel_roc
 from torchmetrics.metric import Metric
-
+from torchmetrics.utilities.imports import _TORCH_GREATER_EQUAL_2_1
 from unittests import NUM_CLASSES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester, inject_ignore_index, remove_ignore_index
@@ -43,7 +44,7 @@ def _reference_sklearn_roc_binary(preds, target, ignore_index=None):
     return [np.nan_to_num(x, nan=0.0) for x in [fpr, tpr, thresholds]]
 
 
-@pytest.mark.parametrize("inputs", (_binary_cases[1], _binary_cases[2], _binary_cases[4], _binary_cases[5]))
+@pytest.mark.parametrize("inputs", [_binary_cases[1], _binary_cases[2], _binary_cases[4], _binary_cases[5]])
 class TestBinaryROC(MetricTester):
     """Test class for `BinaryROC` metric."""
 
@@ -98,8 +99,8 @@ class TestBinaryROC(MetricTester):
     def test_binary_roc_dtype_cpu(self, inputs, dtype):
         """Test dtype support of the metric on CPU."""
         preds, target = inputs
-        if (preds < 0).any() and dtype == torch.half:
-            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision")
+        if not _TORCH_GREATER_EQUAL_2_1 and (preds < 0).any() and dtype == torch.half:
+            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision for torch<2.1")
         self.run_precision_test_cpu(
             preds=preds,
             target=target,
@@ -156,7 +157,7 @@ def _reference_sklearn_roc_multiclass(preds, target, ignore_index=None):
 
 
 @pytest.mark.parametrize(
-    "inputs", (_multiclass_cases[1], _multiclass_cases[2], _multiclass_cases[4], _multiclass_cases[5])
+    "inputs", [_multiclass_cases[1], _multiclass_cases[2], _multiclass_cases[4], _multiclass_cases[5]]
 )
 class TestMulticlassROC(MetricTester):
     """Test class for `MulticlassROC` metric."""
@@ -279,7 +280,7 @@ def _reference_sklearn_roc_multilabel(preds, target, ignore_index=None):
 
 
 @pytest.mark.parametrize(
-    "inputs", (_multilabel_cases[1], _multilabel_cases[2], _multilabel_cases[4], _multilabel_cases[5])
+    "inputs", [_multilabel_cases[1], _multilabel_cases[2], _multilabel_cases[4], _multilabel_cases[5]]
 )
 class TestMultilabelROC(MetricTester):
     """Test class for `MultilabelROC` metric."""

@@ -36,8 +36,8 @@ CURRENT_PORT = START_PORT
 USE_PYTEST_POOL = os.getenv("USE_PYTEST_POOL", "0") == "1"
 
 
-@pytest.fixture()
-def use_deterministic_algorithms():  # noqa: PT004
+@pytest.fixture
+def use_deterministic_algorithms():
     """Set deterministic algorithms for the test."""
     torch.use_deterministic_algorithms(True)
     yield
@@ -45,7 +45,17 @@ def use_deterministic_algorithms():  # noqa: PT004
 
 
 def setup_ddp(rank, world_size):
-    """Initialize ddp environment."""
+    """Initialize ddp environment.
+
+    If a particular test relies on the order of the processes in the pool to be [0, 1, 2, ...], then this function
+    should be called inside the test to ensure that the processes are initialized in the same order they are used in
+    the tests.
+
+    Args:
+        rank: the rank of the process
+        world_size: the number of processes
+
+    """
     global CURRENT_PORT
 
     os.environ["MASTER_ADDR"] = "localhost"
@@ -54,6 +64,9 @@ def setup_ddp(rank, world_size):
     CURRENT_PORT += 1
     if CURRENT_PORT > MAX_PORT:
         CURRENT_PORT = START_PORT
+
+    if torch.distributed.group.WORLD is not None:  # if already initialized, destroy the process group
+        torch.distributed.destroy_process_group()
 
     if torch.distributed.is_available() and sys.platform not in ("win32", "cygwin"):
         torch.distributed.init_process_group("gloo", rank=rank, world_size=world_size)

@@ -17,9 +17,9 @@ import numpy as np
 import pytest
 import torch
 from torch import Tensor
+
 from torchmetrics.audio import ScaleInvariantSignalNoiseRatio
 from torchmetrics.functional.audio import scale_invariant_signal_noise_ratio
-
 from unittests import BATCH_SIZE, NUM_BATCHES, _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -90,7 +90,7 @@ def _reference_speechmetrics_si_sdr(preds: Tensor, target: Tensor, zero_mean: bo
 
 
 @pytest.mark.parametrize(
-    "preds, target, ref_metric",
+    ("preds", "target", "ref_metric"),
     [(inputs.preds, inputs.target, _reference_speechmetrics_si_sdr)],
 )
 class TestSISNR(MetricTester):

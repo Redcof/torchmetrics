@@ -5,18 +5,25 @@
 -r _tests.txt
 
 # add extra requirements
+-r audio.txt
+-r detection.txt
 -r image.txt
 -r text.txt
--r detection.txt
--r audio.txt
 -r multimodal.txt
+-r video.txt
 -r visual.txt
 
 # add extra testing
--r image_test.txt
--r text_test.txt
 -r audio_test.txt
--r detection_test.txt
 -r classification_test.txt
+-r clustering_test.txt
+-r detection_test.txt
+-r image_test.txt
 -r nominal_test.txt
+-r regression_test.txt
 -r segmentation_test.txt
+-r text_test.txt
+
+# hotfix for latest safetensors breaking change to older Torch versions
+# placing this req. freeze here as it is likely used by many packages which has accelerate as dependency
+safetensors <0.7.0

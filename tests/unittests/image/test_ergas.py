@@ -17,10 +17,10 @@ from typing import NamedTuple
 import pytest
 import torch
 from torch import Tensor
+
 from torchmetrics.functional.image.ergas import error_relative_global_dimensionless_synthesis
 from torchmetrics.image.ergas import ErrorRelativeGlobalDimensionlessSynthesis
 from torchmetrics.utilities.imports import _TORCH_GREATER_EQUAL_2_1
-
 from unittests import BATCH_SIZE, NUM_BATCHES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -76,7 +76,7 @@ def _reference_ergas(
 
 @pytest.mark.parametrize("reduction", ["sum", "elementwise_mean"])
 @pytest.mark.parametrize(
-    "preds, target, ratio",
+    ("preds", "target", "ratio"),
     [(i.preds, i.target, i.ratio) for i in _inputs],
 )
 class TestErrorRelativeGlobalDimensionlessSynthesis(MetricTester):

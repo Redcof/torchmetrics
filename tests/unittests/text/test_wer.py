@@ -11,27 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Union
+from typing import Union
 
 import pytest
+
 from torchmetrics.functional.text.wer import word_error_rate
 from torchmetrics.text.wer import WordErrorRate
-
 from unittests.text._helpers import TextTester
 from unittests.text._inputs import _inputs_error_rate_batch_size_1, _inputs_error_rate_batch_size_2
 
 
-def _reference_jiwer_wer(preds: Union[str, List[str]], target: Union[str, List[str]]):
+def _reference_jiwer_wer(preds: Union[str, list[str]], target: Union[str, list[str]]):
     try:
-        from jiwer import compute_measures
+        from jiwer import wer
     except ImportError:
         pytest.skip("test requires jiwer package to be installed")
 
-    return compute_measures(target, preds)["wer"]
+    return wer(target, preds)
 
 
 @pytest.mark.parametrize(
-    ["preds", "targets"],
+    ("preds", "targets"),
     [
         (_inputs_error_rate_batch_size_1.preds, _inputs_error_rate_batch_size_1.target),
         (_inputs_error_rate_batch_size_2.preds, _inputs_error_rate_batch_size_2.target),

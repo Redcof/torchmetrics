@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Optional, Sequence, Type, Union
+from collections.abc import Sequence
+from typing import Any, Optional, Union
 
 from torch import Tensor
 from typing_extensions import Literal
@@ -467,7 +468,7 @@ class Accuracy(_ClassificationTaskWrapper):
     Where :math:`y` is a tensor of target values, and :math:`\hat{y}` is a tensor of predictions.
 
     This module is a simple wrapper to get the task specific versions of this metric, which is done by setting the
-    ``task`` argument to either ``'binary'``, ``'multiclass'`` or ``multilabel``. See the documentation of
+    ``task`` argument to either ``'binary'``, ``'multiclass'`` or ``'multilabel'``. See the documentation of
     :class:`~torchmetrics.classification.BinaryAccuracy`, :class:`~torchmetrics.classification.MulticlassAccuracy` and
     :class:`~torchmetrics.classification.MultilabelAccuracy` for the specific details of each argument influence and
     examples.
@@ -489,7 +490,7 @@ class Accuracy(_ClassificationTaskWrapper):
     """
 
     def __new__(  # type: ignore[misc]
-        cls: Type["Accuracy"],
+        cls: type["Accuracy"],
         task: Literal["binary", "multiclass", "multilabel"],
         threshold: float = 0.5,
         num_classes: Optional[int] = None,

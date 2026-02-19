@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Optional, Sequence, Type, Union
+from collections.abc import Sequence
+from typing import Any, Optional, Union
 
 from torch import Tensor
 from typing_extensions import Literal
@@ -476,7 +477,7 @@ class HammingDistance(_ClassificationTaskWrapper):
     tensor.
 
     This function is a simple wrapper to get the task specific versions of this metric, which is done by setting the
-    ``task`` argument to either ``'binary'``, ``'multiclass'`` or ``multilabel``. See the documentation of
+    ``task`` argument to either ``'binary'``, ``'multiclass'`` or ``'multilabel'``. See the documentation of
     :class:`~torchmetrics.classification.BinaryHammingDistance`,
     :class:`~torchmetrics.classification.MulticlassHammingDistance` and
     :class:`~torchmetrics.classification.MultilabelHammingDistance` for the specific details of each argument influence
@@ -493,7 +494,7 @@ class HammingDistance(_ClassificationTaskWrapper):
     """
 
     def __new__(  # type: ignore[misc]
-        cls: Type["HammingDistance"],
+        cls: type["HammingDistance"],
         task: Literal["binary", "multiclass", "multilabel"],
         threshold: float = 0.5,
         num_classes: Optional[int] = None,

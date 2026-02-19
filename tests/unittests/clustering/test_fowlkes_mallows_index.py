@@ -13,9 +13,9 @@
 # limitations under the License.
 import pytest
 from sklearn.metrics import fowlkes_mallows_score as sklearn_fowlkes_mallows_score
+
 from torchmetrics.clustering import FowlkesMallowsIndex
 from torchmetrics.functional.clustering import fowlkes_mallows_index
-
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
 from unittests.clustering._inputs import _single_target_extrinsic1, _single_target_extrinsic2
@@ -24,7 +24,7 @@ seed_all(42)
 
 
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [
         (_single_target_extrinsic1.preds, _single_target_extrinsic1.target),
         (_single_target_extrinsic2.preds, _single_target_extrinsic2.target),

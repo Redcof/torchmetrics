@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from collections.abc import Sequence
 from functools import lru_cache
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import Any, Optional, Union
 
 from torch.nn import Module
 
@@ -73,21 +74,23 @@ class FeatureShare(MetricCollection):
         >>> # initialize the metrics
         >>> fs = FeatureShare([FrechetInceptionDistance(), KernelInceptionDistance(subset_size=10, subsets=2)])
         >>> # update metric
-        >>> fs.update(torch.randint(255, (50, 3, 64, 64), dtype=torch.uint8), real=True)
-        >>> fs.update(torch.randint(255, (50, 3, 64, 64), dtype=torch.uint8), real=False)
+        >>> input_tensor = torch.randint(255, (50, 3, 64, 64), dtype=torch.uint8, generator=torch.manual_seed(42))
+        >>> fs.update(input_tensor, real=True)
+        >>> input_tensor = torch.randint(255, (50, 3, 64, 64), dtype=torch.uint8, generator=torch.manual_seed(43))
+        >>> fs.update(input_tensor, real=False)
         >>> # compute metric
         >>> fs.compute()
-        {'FrechetInceptionDistance': tensor(15.1700), 'KernelInceptionDistance': (tensor(-0.0012), tensor(0.0014))}
+        {'FrechetInceptionDistance': tensor(13.5367), 'KernelInceptionDistance': (tensor(0.0003), tensor(0.0003))}
 
     """
 
     def __init__(
         self,
-        metrics: Union[Metric, Sequence[Metric], Dict[str, Metric]],
+        metrics: Union[Metric, Sequence[Metric], dict[str, Metric]],
         max_cache_size: Optional[int] = None,
     ) -> None:
         # disable compute groups because the feature sharing is more custom
-        super().__init__(metrics=metrics, compute_groups=False)
+        super().__init__(metrics=metrics, compute_groups=False)  # type: ignore
 
         if max_cache_size is None:
             max_cache_size = len(self)
@@ -96,6 +99,8 @@ class FeatureShare(MetricCollection):
 
         try:
             first_net = next(iter(self.values()))
+            if not isinstance(first_net.feature_network, str):
+                raise TypeError("The `feature_network` attribute must be a string.")
             network_to_share = getattr(first_net, first_net.feature_network)
         except AttributeError as err:
             raise AttributeError(
@@ -103,6 +108,8 @@ class FeatureShare(MetricCollection):
                 " attribute. Please make sure that the metric has an attribute with that name,"
                 " else it cannot be shared."
             ) from err
+        except TypeError as err:
+            raise TypeError("The `feature_network` attribute must be a string representing the network name.") from err
         cached_net = NetworkCache(network_to_share, max_size=max_cache_size)
 
         # set the cached network to all metrics
@@ -113,6 +120,8 @@ class FeatureShare(MetricCollection):
                     " `feature_network` attribute. Please make sure that all metrics have a attribute with that name,"
                     f" else it cannot be shared. Failed on metric {metric_name}."
                 )
+            if not isinstance(metric.feature_network, str):
+                raise TypeError(f"Metric {metric_name}'s `feature_network` attribute must be a string.")
 
             # check if its the same network as the first metric
             if str(getattr(metric, metric.feature_network)) != str(network_to_share):

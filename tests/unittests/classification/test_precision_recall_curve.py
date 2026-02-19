@@ -20,6 +20,7 @@ import torch
 from scipy.special import expit as sigmoid
 from scipy.special import softmax
 from sklearn.metrics import precision_recall_curve as sk_precision_recall_curve
+
 from torchmetrics.classification.precision_recall_curve import (
     BinaryPrecisionRecallCurve,
     MulticlassPrecisionRecallCurve,
@@ -32,7 +33,7 @@ from torchmetrics.functional.classification.precision_recall_curve import (
     multilabel_precision_recall_curve,
 )
 from torchmetrics.metric import Metric
-
+from torchmetrics.utilities.imports import _TORCH_GREATER_EQUAL_2_1
 from unittests import NUM_CLASSES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester, inject_ignore_index, remove_ignore_index
@@ -50,7 +51,7 @@ def _reference_sklearn_precision_recall_curve_binary(preds, target, ignore_index
     return sk_precision_recall_curve(target, preds)
 
 
-@pytest.mark.parametrize("inputs", (_binary_cases[1], _binary_cases[2], _binary_cases[4], _binary_cases[5]))
+@pytest.mark.parametrize("inputs", [_binary_cases[1], _binary_cases[2], _binary_cases[4], _binary_cases[5]])
 class TestBinaryPrecisionRecallCurve(MetricTester):
     """Test class for `BinaryPrecisionRecallCurve` metric."""
 
@@ -105,8 +106,8 @@ class TestBinaryPrecisionRecallCurve(MetricTester):
     def test_binary_precision_recall_curve_dtype_cpu(self, inputs, dtype):
         """Test dtype support of the metric on CPU."""
         preds, target = inputs
-        if (preds < 0).any() and dtype == torch.half:
-            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision")
+        if not _TORCH_GREATER_EQUAL_2_1 and (preds < 0).any() and dtype == torch.half:
+            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision for torch<2.1")
         self.run_precision_test_cpu(
             preds=preds,
             target=target,
@@ -173,7 +174,7 @@ def _reference_sklearn_precision_recall_curve_multiclass(preds, target, ignore_i
 
 
 @pytest.mark.parametrize(
-    "inputs", (_multiclass_cases[1], _multiclass_cases[2], _multiclass_cases[4], _multiclass_cases[5])
+    "inputs", [_multiclass_cases[1], _multiclass_cases[2], _multiclass_cases[4], _multiclass_cases[5]]
 )
 class TestMulticlassPrecisionRecallCurve(MetricTester):
     """Test class for `MulticlassPrecisionRecallCurve` metric."""
@@ -312,7 +313,7 @@ def _reference_sklearn_precision_recall_curve_multilabel(preds, target, ignore_i
 
 
 @pytest.mark.parametrize(
-    "inputs", (_multilabel_cases[1], _multilabel_cases[2], _multilabel_cases[4], _multilabel_cases[5])
+    "inputs", [_multilabel_cases[1], _multilabel_cases[2], _multilabel_cases[4], _multilabel_cases[5]]
 )
 class TestMultilabelPrecisionRecallCurve(MetricTester):
     """Test class for `MultilabelPrecisionRecallCurve` metric."""
@@ -470,3 +471,21 @@ def test_wrapper_class(metric, kwargs, base_metric=PrecisionRecallCurve):
         instance = base_metric(**kwargs)
         assert isinstance(instance, metric)
         assert isinstance(instance, Metric)
+
+
+@pytest.mark.parametrize("thresholds", [5, 10])
+def test_precision_nan_when_no_preds_meet_threshold(thresholds):
+    """If threshold > max(preds), precision should be NaN, recall should be 0.0."""
+    preds = torch.tensor([0.1, 0.2, 0.3, 0.4])
+    targets = torch.tensor([0, 1, 1, 0])
+    metric = BinaryPrecisionRecallCurve(thresholds=thresholds)
+    precision, recall, thres = metric(preds, targets)
+
+    mask = thres > preds.max()
+
+    precision_bins = precision[:-1]
+    recall_bins = recall[:-1]
+
+    assert torch.isnan(precision_bins[mask]).all(), f"Precision not NaN for thresholds {thres[mask]}"
+
+    assert torch.all(recall_bins[mask] == 0.0), f"Recall not zero for thresholds {thres[mask]}"

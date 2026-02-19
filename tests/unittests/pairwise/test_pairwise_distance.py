@@ -24,6 +24,7 @@ from sklearn.metrics.pairwise import (
     pairwise_distances,
 )
 from torch import Tensor
+
 from torchmetrics.functional import (
     pairwise_cosine_similarity,
     pairwise_euclidean_distance,
@@ -31,7 +32,6 @@ from torchmetrics.functional import (
     pairwise_manhattan_distance,
     pairwise_minkowski_distance,
 )
-
 from unittests import BATCH_SIZE, NUM_BATCHES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -70,18 +70,18 @@ def _wrap_reduction(x, y, sk_fn, reduction):
 
 
 @pytest.mark.parametrize(
-    "x, y",
+    ("x", "y"),
     [
         (_inputs1.x, _inputs1.y),
         (_inputs2.x, _inputs2.y),
     ],
 )
 @pytest.mark.parametrize(
-    "metric_functional, sk_fn",
+    ("metric_functional", "sk_fn"),
     [
         pytest.param(pairwise_cosine_similarity, cosine_similarity, id="cosine"),
         pytest.param(pairwise_euclidean_distance, euclidean_distances, id="euclidean"),
-        pytest.param(pairwise_manhattan_distance, manhattan_distances, id="manhatten"),
+        pytest.param(pairwise_manhattan_distance, manhattan_distances, id="manhattan"),
         pytest.param(pairwise_linear_similarity, linear_kernel, id="linear"),
         pytest.param(
             partial(pairwise_minkowski_distance, exponent=3),

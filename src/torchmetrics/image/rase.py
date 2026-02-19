@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any, List, Optional, Union
 
 from torch import Tensor
 
@@ -69,11 +70,11 @@ class RelativeAverageSpectralError(Metric):
     def __init__(
         self,
         window_size: int = 8,
-        **kwargs: Dict[str, Any],
+        **kwargs: dict[str, Any],
     ) -> None:
         super().__init__(**kwargs)
 
-        if not isinstance(window_size, int) or isinstance(window_size, int) and window_size < 1:
+        if not isinstance(window_size, int) or (isinstance(window_size, int) and window_size < 1):
             raise ValueError(f"Argument `window_size` is expected to be a positive integer, but got {window_size}")
         self.window_size = window_size
 

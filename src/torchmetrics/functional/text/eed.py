@@ -88,8 +88,9 @@
 
 import re
 import unicodedata
+from collections.abc import Sequence
 from math import inf
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Union
 
 from torch import Tensor, stack, tensor
 from typing_extensions import Literal
@@ -253,7 +254,7 @@ def _preprocess_sentences(
     preds: Union[str, Sequence[str]],
     target: Sequence[Union[str, Sequence[str]]],
     language: Literal["en", "ja"],
-) -> Tuple[Union[str, Sequence[str]], Sequence[Union[str, Sequence[str]]]]:
+) -> tuple[Union[str, Sequence[str]], Sequence[Union[str, Sequence[str]]]]:
     """Preprocess strings according to language requirements.
 
     Args:
@@ -370,7 +371,7 @@ def extended_edit_distance(
     rho: float = 0.3,
     deletion: float = 0.2,
     insertion: float = 1.0,
-) -> Union[Tensor, Tuple[Tensor, Tensor]]:
+) -> Union[Tensor, tuple[Tensor, Tensor]]:
     """Compute extended edit distance score (`ExtendedEditDistance`_) [1] for strings or list of strings.
 
     The metric utilises the Levenshtein distance and extends it by adding a jump operation.
@@ -402,7 +403,7 @@ def extended_edit_distance(
     """
     # input validation for parameters
     for param_name, param in zip(["alpha", "rho", "deletion", "insertion"], [alpha, rho, deletion, insertion]):
-        if not isinstance(param, float) or isinstance(param, float) and param < 0:
+        if not isinstance(param, float) or (isinstance(param, float) and param < 0):
             raise ValueError(f"Parameter `{param_name}` is expected to be a non-negative float.")
 
     sentence_level_scores = _eed_update(preds, target, language, alpha, rho, deletion, insertion)

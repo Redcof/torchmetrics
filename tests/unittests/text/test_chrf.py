@@ -11,14 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from collections.abc import Sequence
 from functools import partial
-from typing import Sequence
 
 import pytest
 from torch import Tensor, tensor
+
 from torchmetrics.functional.text.chrf import chrf_score
 from torchmetrics.text.chrf import CHRFScore
-
 from unittests.text._helpers import TextTester
 from unittests.text._inputs import _inputs_multiple_references, _inputs_single_sentence_multiple_references
 
@@ -46,7 +46,7 @@ def _reference_sacrebleu_chrf(
 
 
 @pytest.mark.parametrize(
-    ["char_order", "word_order", "lowercase", "whitespace"],
+    ("char_order", "word_order", "lowercase", "whitespace"),
     [
         (6, 2, False, False),
         (6, 2, False, True),
@@ -57,7 +57,7 @@ def _reference_sacrebleu_chrf(
     ],
 )
 @pytest.mark.parametrize(
-    ["preds", "targets"],
+    ("preds", "targets"),
     [(_inputs_multiple_references.preds, _inputs_multiple_references.target)],
 )
 class TestCHRFScore(TextTester):

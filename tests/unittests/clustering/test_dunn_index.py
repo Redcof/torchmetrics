@@ -16,9 +16,9 @@ from itertools import combinations
 
 import numpy as np
 import pytest
+
 from torchmetrics.clustering.dunn_index import DunnIndex
 from torchmetrics.functional.clustering.dunn_index import dunn_index
-
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
 from unittests.clustering._inputs import (
@@ -46,7 +46,7 @@ def _reference_np_dunn_index(data, labels, p):
 
 
 @pytest.mark.parametrize(
-    "data, labels",
+    ("data", "labels"),
     [
         (_single_target_intrinsic1.data, _single_target_intrinsic1.labels),
         (_single_target_intrinsic2.data, _single_target_intrinsic2.labels),

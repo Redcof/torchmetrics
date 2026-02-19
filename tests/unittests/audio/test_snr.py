@@ -17,9 +17,9 @@ import pytest
 import torch
 from mir_eval.separation import bss_eval_images as mir_eval_bss_eval_images
 from torch import Tensor
+
 from torchmetrics.audio import SignalNoiseRatio
 from torchmetrics.functional.audio import signal_noise_ratio
-
 from unittests import _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -53,7 +53,7 @@ def _reference_bss_snr(preds: Tensor, target: Tensor, zero_mean: bool):
 
 
 @pytest.mark.parametrize(
-    "preds, target, ref_metric, zero_mean",
+    ("preds", "target", "ref_metric", "zero_mean"),
     [
         (inputs.preds, inputs.target, partial(_reference_bss_snr, zero_mean=True), True),
         (inputs.preds, inputs.target, partial(_reference_bss_snr, zero_mean=False), False),

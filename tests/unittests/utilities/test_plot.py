@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 from functools import partial
 from typing import Callable
 
@@ -21,6 +20,13 @@ import numpy as np
 import pytest
 import torch
 from torch import tensor
+from unittests._helpers import (
+    _IS_WINDOWS,
+    _TORCH_LESS_THAN_2_1,
+    _TRANSFORMERS_GREATER_EQUAL_4_54,
+    _TRANSFORMERS_RANGE_GE_4_50_LT_4_54,
+)
+
 from torchmetrics import MetricCollection
 from torchmetrics.aggregation import MaxMetric, MeanMetric, MinMetric, SumMetric
 from torchmetrics.audio import (
@@ -41,31 +47,34 @@ from torchmetrics.classification import (
     BinaryCalibrationError,
     BinaryCohenKappa,
     BinaryConfusionMatrix,
+    BinaryEER,
     BinaryF1Score,
     BinaryFairness,
     BinaryFBetaScore,
     BinaryHammingDistance,
     BinaryHingeLoss,
     BinaryJaccardIndex,
+    BinaryLogAUC,
     BinaryMatthewsCorrCoef,
     BinaryPrecision,
     BinaryPrecisionRecallCurve,
     BinaryRecall,
     BinaryROC,
     BinarySpecificity,
-    Dice,
     MulticlassAccuracy,
     MulticlassAUROC,
     MulticlassAveragePrecision,
     MulticlassCalibrationError,
     MulticlassCohenKappa,
     MulticlassConfusionMatrix,
+    MulticlassEER,
     MulticlassExactMatch,
     MulticlassF1Score,
     MulticlassFBetaScore,
     MulticlassHammingDistance,
     MulticlassHingeLoss,
     MulticlassJaccardIndex,
+    MulticlassLogAUC,
     MulticlassMatthewsCorrCoef,
     MulticlassPrecision,
     MulticlassPrecisionRecallCurve,
@@ -80,6 +89,7 @@ from torchmetrics.classification import (
     MultilabelFBetaScore,
     MultilabelHammingDistance,
     MultilabelJaccardIndex,
+    MultilabelLogAUC,
     MultilabelMatthewsCorrCoef,
     MultilabelPrecision,
     MultilabelPrecisionRecallCurve,
@@ -101,6 +111,7 @@ from torchmetrics.detection import PanopticQuality
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 from torchmetrics.functional.audio import scale_invariant_signal_noise_ratio
 from torchmetrics.image import (
+    DeepImageStructureAndTextureSimilarity,
     ErrorRelativeGlobalDimensionlessSynthesis,
     FrechetInceptionDistance,
     InceptionScore,
@@ -117,11 +128,14 @@ from torchmetrics.image import (
     TotalVariation,
     UniversalImageQualityIndex,
 )
+from torchmetrics.multimodal import LipVertexError
 from torchmetrics.nominal import CramersV, FleissKappa, PearsonsContingencyCoefficient, TheilsU, TschuprowsT
 from torchmetrics.regression import (
     ConcordanceCorrCoef,
+    ContinuousRankedProbabilityScore,
     CosineSimilarity,
     ExplainedVariance,
+    JensenShannonDivergence,
     KendallRankCorrCoef,
     KLDivergence,
     LogCoshError,
@@ -130,6 +144,7 @@ from torchmetrics.regression import (
     MeanSquaredError,
     MeanSquaredLogError,
     MinkowskiDistance,
+    NormalizedRootMeanSquaredError,
     PearsonCorrCoef,
     R2Score,
     RelativeSquaredError,
@@ -167,10 +182,6 @@ from torchmetrics.text import (
     WordErrorRate,
     WordInfoLost,
     WordInfoPreserved,
-)
-from torchmetrics.utilities.imports import (
-    _TORCH_GREATER_EQUAL_1_12,
-    _TORCHAUDIO_GREATER_EQUAL_0_10,
 )
 from torchmetrics.utilities.plot import _get_col_row_split
 from torchmetrics.wrappers import (
@@ -236,6 +247,24 @@ _text_input_4 = lambda: [["there is a cat on the mat", "a cat is on the mat"]]
             id="multiclass auroc and average=None",
         ),
         pytest.param(
+            BinaryEER,
+            _rand_input,
+            _binary_randint_input,
+            id="binary eer",
+        ),
+        pytest.param(
+            partial(MulticlassEER, num_classes=3),
+            _multiclass_randn_input,
+            _multiclass_randint_input,
+            id="multiclass eer",
+        ),
+        pytest.param(
+            partial(MulticlassEER, num_classes=3, average=None),
+            _multiclass_randn_input,
+            _multiclass_randint_input,
+            id="multiclass eer",
+        ),
+        pytest.param(
             partial(PearsonsContingencyCoefficient, num_classes=5),
             _nominal_input,
             _nominal_input,
@@ -258,7 +287,7 @@ _text_input_4 = lambda: [["there is a cat on the mat", "a cat is on the mat"]]
             id="error relative global dimensionless synthesis",
         ),
         pytest.param(
-            PeakSignalNoiseRatio,
+            partial(PeakSignalNoiseRatio, data_range=3.0),
             lambda: torch.tensor([[0.0, 1.0], [2.0, 3.0]]),
             lambda: torch.tensor([[3.0, 2.0], [1.0, 0.0]]),
             id="peak signal noise ratio",
@@ -316,7 +345,6 @@ _text_input_4 = lambda: [["there is a cat on the mat", "a cat is on the mat"]]
             _audio_input,
             None,
             id="speech_reverberation_modulation_energy_ratio",
-            marks=pytest.mark.skipif(not _TORCHAUDIO_GREATER_EQUAL_0_10, reason="test requires torchaudio>=0.10"),
         ),
         pytest.param(
             partial(PermutationInvariantTraining, metric_func=scale_invariant_signal_noise_ratio, eval_func="max"),
@@ -342,9 +370,6 @@ _text_input_4 = lambda: [["there is a cat on the mat", "a cat is on the mat"]]
             _panoptic_input,
             _panoptic_input,
             id="panoptic quality",
-            marks=pytest.mark.skipif(
-                not _TORCH_GREATER_EQUAL_1_12, reason="Panoptic Quality metric requires PyTorch 1.12 or later"
-            ),
         ),
         pytest.param(BinaryAveragePrecision, _rand_input, _binary_randint_input, id="binary average precision"),
         pytest.param(
@@ -390,6 +415,19 @@ _text_input_4 = lambda: [["there is a cat on the mat", "a cat is on the mat"]]
             _multilabel_rand_input,
             _multilabel_randint_input,
             id="multilabel specificity",
+        ),
+        pytest.param(BinaryLogAUC, _rand_input, _binary_randint_input, id="binary log auc"),
+        pytest.param(
+            partial(MulticlassLogAUC, num_classes=3),
+            _multiclass_randn_input,
+            _multiclass_randint_input,
+            id="multiclass log auc",
+        ),
+        pytest.param(
+            partial(MultilabelLogAUC, num_labels=3),
+            _multilabel_rand_input,
+            _multilabel_randint_input,
+            id="multilabel log auc",
         ),
         pytest.param(
             partial(MultilabelCoverageError, num_labels=3),
@@ -462,12 +500,30 @@ _text_input_4 = lambda: [["there is a cat on the mat", "a cat is on the mat"]]
             lambda: torch.rand(10, 3, 100, 100),
             id="learned perceptual image patch similarity",
         ),
+        pytest.param(
+            DeepImageStructureAndTextureSimilarity,
+            _image_input,
+            _image_input,
+            id="deep image structure and texture similarity",
+        ),
         pytest.param(ConcordanceCorrCoef, _rand_input, _rand_input, id="concordance corr coef"),
         pytest.param(CosineSimilarity, _multilabel_rand_input, _multilabel_rand_input, id="cosine similarity"),
+        pytest.param(
+            ContinuousRankedProbabilityScore,
+            lambda: torch.randn(10, 5),
+            _rand_input,
+            id="continues ranked probability score",
+        ),
         pytest.param(ExplainedVariance, _rand_input, _rand_input, id="explained variance"),
         pytest.param(KendallRankCorrCoef, _rand_input, _rand_input, id="kendall rank corr coef"),
         pytest.param(
             KLDivergence,
+            lambda: torch.randn(10, 3).softmax(dim=-1),
+            lambda: torch.randn(10, 3).softmax(dim=-1),
+            id="kl divergence",
+        ),
+        pytest.param(
+            JensenShannonDivergence,
             lambda: torch.randn(10, 3).softmax(dim=-1),
             lambda: torch.randn(10, 3).softmax(dim=-1),
             id="kl divergence",
@@ -477,6 +533,7 @@ _text_input_4 = lambda: [["there is a cat on the mat", "a cat is on the mat"]]
         pytest.param(MeanAbsoluteError, _rand_input, _rand_input, id="mean absolute error"),
         pytest.param(MeanAbsolutePercentageError, _rand_input, _rand_input, id="mean absolute percentage error"),
         pytest.param(partial(MinkowskiDistance, p=3), _rand_input, _rand_input, id="minkowski distance"),
+        pytest.param(NormalizedRootMeanSquaredError, _rand_input, _rand_input, id="normalized root mean squared error"),
         pytest.param(PearsonCorrCoef, _rand_input, _rand_input, id="pearson corr coef"),
         pytest.param(R2Score, _rand_input, _rand_input, id="r2 score"),
         pytest.param(RelativeSquaredError, _rand_input, _rand_input, id="relative squared error"),
@@ -508,7 +565,6 @@ _text_input_4 = lambda: [["there is a cat on the mat", "a cat is on the mat"]]
             _rand_input,
             id="running metric wrapper",
         ),
-        pytest.param(Dice, _multiclass_randint_input, _multiclass_randint_input, id="dice"),
         pytest.param(
             partial(MulticlassExactMatch, num_classes=3),
             lambda: torch.randint(3, (20, 5)),
@@ -593,6 +649,20 @@ _text_input_4 = lambda: [["there is a cat on the mat", "a cat is on the mat"]]
             _text_input_1,
             _text_input_2,
             id="info lm",
+            marks=[
+                pytest.mark.xfail(
+                    RuntimeError,
+                    # todo: if the transformers compatibility issue present in next feature release,
+                    #  consider bumping also torch min versions in the metrics implementations
+                    condition=_TORCH_LESS_THAN_2_1 and _TRANSFORMERS_RANGE_GE_4_50_LT_4_54,
+                    reason="could be due to torch compatibility issues with transformers",
+                ),
+                pytest.mark.xfail(
+                    ImportError,
+                    condition=_TORCH_LESS_THAN_2_1 and _IS_WINDOWS and _TRANSFORMERS_GREATER_EQUAL_4_54,
+                    reason="another strange behaviour of transformers on windows",
+                ),
+            ],
         ),
         pytest.param(Perplexity, lambda: torch.rand(2, 8, 5), lambda: torch.randint(5, (2, 8)), id="perplexity"),
         pytest.param(ROUGEScore, lambda: "My name is John", lambda: "Is your name John", id="rouge score"),
@@ -615,6 +685,12 @@ _text_input_4 = lambda: [["there is a cat on the mat", "a cat is on the mat"]]
             lambda: torch.randn(1, 100, 3),
             lambda: torch.randn(1, 100, 3),
             id="procrustes disparity",
+        ),
+        pytest.param(
+            partial(LipVertexError, mouth_map=[0, 1, 2, 3, 4]),
+            lambda: torch.randn(10, 100, 3),
+            lambda: torch.randn(10, 100, 3),
+            id="lip vertex error",
         ),
     ],
 )
@@ -706,7 +782,14 @@ def test_plot_methods_special_image_metrics(metric_class, preds, target, index_0
     plt.close(fig)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="DDP not supported on windows")
+@pytest.mark.skipif(_IS_WINDOWS, reason="DDP not supported on windows")
+@pytest.mark.xfail(
+    RuntimeError,
+    # todo: if the transformers compatibility issue present in next feature release,
+    #  consider bumping also torch min versions in the metrics implementations
+    condition=_TORCH_LESS_THAN_2_1 and _TRANSFORMERS_RANGE_GE_4_50_LT_4_54,
+    reason="could be due to torch compatibility issues with transformers",
+)
 def test_plot_methods_special_text_metrics():
     """Test the plot method for text metrics that does not fit the default testing format."""
     metric = BERTScore()

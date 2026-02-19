@@ -17,9 +17,9 @@ import numpy as np
 import pytest
 import torch
 from sewar.full_ref import scc as sewar_scc
+
 from torchmetrics.functional.image import spatial_correlation_coefficient
 from torchmetrics.image import SpatialCorrelationCoefficient
-
 from unittests import BATCH_SIZE, NUM_BATCHES, _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -58,7 +58,7 @@ def _reference_sewar_scc_simple(preds, target):
     return _reference_sewar_scc(preds, target, hp_filter, window_size=8, reduction="mean")
 
 
-@pytest.mark.parametrize("preds, target", [(i.preds, i.target) for i in _inputs])
+@pytest.mark.parametrize(("preds", "target"), [(i.preds, i.target) for i in _inputs])
 class TestSpatialCorrelationCoefficient(MetricTester):
     """Tests for SpatialCorrelationCoefficient metric."""
 

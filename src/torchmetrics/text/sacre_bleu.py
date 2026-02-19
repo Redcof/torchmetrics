@@ -17,7 +17,8 @@
 # Authors: torchtext authors and @sluks
 # Date: 2020-07-18
 # Link: https://pytorch.org/text/_modules/torchtext/data/metrics.html#bleu_score
-from typing import Any, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any, Optional, Union
 
 from torch import Tensor
 
@@ -45,6 +46,28 @@ class SacreBLEUScore(BLEUScore):
     As output of ``forward`` and ``compute`` the metric returns the following output:
 
     - ``sacre_bleu`` (:class:`~torch.Tensor`): A tensor with the SacreBLEU Score
+
+    .. note::
+        In the original SacreBLEU, references are passed as a list of reference sets (grouped by reference index).
+        In TorchMetrics, references are passed grouped per prediction (each prediction has its own list of references).
+
+        For example::
+
+            # Predictions
+            preds = ['The dog bit the man.', "It wasn't surprising.", 'The man had just bitten him.']
+
+            # Original SacreBLEU:
+            refs = [
+                ['The dog bit the man.', 'It was not unexpected.', 'The man bit him first.'], # First set
+                ['The dog had bit the man.', 'No one was surprised.', 'The man had bitten the dog.'], # Second set
+            ]
+
+            # TorchMetrics SacreBLEU:
+            target = [
+                ['The dog bit the man.', 'The dog had bit the man.'], # References for first prediction
+                ['It was not unexpected.', 'No one was surprised.'], # References for second prediction
+                ['The man bit him first.', 'The man had bitten the dog.'], # References for third prediction
+            ]
 
     Args:
         n_gram: Gram value ranged from 1 to 4

@@ -15,12 +15,13 @@ from typing import Callable, Optional, Union
 
 import numpy as np
 import pytest
+import torch
 from sklearn.metrics import label_ranking_average_precision_score
 from torch import Tensor
-from torchmetrics.functional.retrieval.reciprocal_rank import retrieval_reciprocal_rank
-from torchmetrics.retrieval.reciprocal_rank import RetrievalMRR
 from typing_extensions import Literal
 
+from torchmetrics.functional.retrieval.reciprocal_rank import retrieval_reciprocal_rank
+from torchmetrics.retrieval.reciprocal_rank import RetrievalMRR
 from unittests._helpers import seed_all
 from unittests.retrieval.helpers import (
     RetrievalMetricTester,
@@ -197,3 +198,12 @@ class TestMRR(RetrievalMetricTester):
             exception_type=ValueError,
             kwargs_update=metric_args,
         )
+
+    def test_mrr_all_zero_predictions_returns_zero(self):
+        """Test that MRR returns 0 when all predictions are zero and there are positive targets."""
+        preds = torch.tensor([0.0, 0.0, 0.0])
+        target = torch.tensor([1, 0, 1])
+        indexes = torch.tensor([0, 0, 0])
+        metric = RetrievalMRR()
+        result = metric(preds, target, indexes=indexes)
+        assert result == 0.0, f"Expected MRR to be 0.0, got {result}"

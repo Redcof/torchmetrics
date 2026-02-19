@@ -28,19 +28,27 @@ from torchmetrics.utilities.imports import (
     _ONNXRUNTIME_AVAILABLE,
     _PESQ_AVAILABLE,
     _PYSTOI_AVAILABLE,
+    _REQUESTS_AVAILABLE,
+    _SCIPI_AVAILABLE,
     _TORCHAUDIO_AVAILABLE,
-    _TORCHAUDIO_GREATER_EQUAL_0_10,
 )
 
+if _SCIPI_AVAILABLE:
+    import scipy.signal
+
+    # back compatibility patch due to SMRMpy using scipy.signal.hamming
+    if not hasattr(scipy.signal, "hamming"):
+        scipy.signal.hamming = scipy.signal.windows.hamming
+
 __all__ = [
+    "complex_scale_invariant_signal_noise_ratio",
     "permutation_invariant_training",
     "pit_permutate",
     "scale_invariant_signal_distortion_ratio",
-    "source_aggregated_signal_distortion_ratio",
-    "signal_distortion_ratio",
     "scale_invariant_signal_noise_ratio",
+    "signal_distortion_ratio",
     "signal_noise_ratio",
-    "complex_scale_invariant_signal_noise_ratio",
+    "source_aggregated_signal_distortion_ratio",
 ]
 
 if _PESQ_AVAILABLE:
@@ -53,7 +61,7 @@ if _PYSTOI_AVAILABLE:
 
     __all__ += ["short_time_objective_intelligibility"]
 
-if _GAMMATONE_AVAILABLE and _TORCHAUDIO_AVAILABLE and _TORCHAUDIO_GREATER_EQUAL_0_10:
+if _GAMMATONE_AVAILABLE and _TORCHAUDIO_AVAILABLE:
     from torchmetrics.functional.audio.srmr import speech_reverberation_modulation_energy_ratio
 
     __all__ += ["speech_reverberation_modulation_energy_ratio"]
@@ -62,3 +70,8 @@ if _LIBROSA_AVAILABLE and _ONNXRUNTIME_AVAILABLE:
     from torchmetrics.functional.audio.dnsmos import deep_noise_suppression_mean_opinion_score
 
     __all__ += ["deep_noise_suppression_mean_opinion_score"]
+
+if _LIBROSA_AVAILABLE and _REQUESTS_AVAILABLE:
+    from torchmetrics.functional.audio.nisqa import non_intrusive_speech_quality_assessment
+
+    __all__ += ["non_intrusive_speech_quality_assessment"]

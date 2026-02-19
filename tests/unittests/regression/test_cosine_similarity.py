@@ -17,9 +17,9 @@ import numpy as np
 import pytest
 import torch
 from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
+
 from torchmetrics.functional.regression.cosine_similarity import cosine_similarity
 from torchmetrics.regression.cosine_similarity import CosineSimilarity
-
 from unittests import BATCH_SIZE, NUM_BATCHES, _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -55,7 +55,7 @@ def _reference_sklearn_cosine(preds, target, reduction):
 
 @pytest.mark.parametrize("reduction", ["sum", "mean"])
 @pytest.mark.parametrize(
-    "preds, target, ref_metric",
+    ("preds", "target", "ref_metric"),
     [
         (_single_target_inputs.preds, _single_target_inputs.target, _reference_sklearn_cosine),
         (_multi_target_inputs.preds, _multi_target_inputs.target, _reference_sklearn_cosine),

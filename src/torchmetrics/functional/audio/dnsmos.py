@@ -13,7 +13,7 @@
 # limitations under the License.
 import os
 from functools import lru_cache
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import numpy as np
 import torch
@@ -33,7 +33,7 @@ else:
     class InferenceSession:  # type:ignore
         """Dummy InferenceSession."""
 
-        def __init__(self, **kwargs: Dict[str, Any]) -> None: ...
+        def __init__(self, **kwargs: dict[str, Any]) -> None: ...
 
 
 __doctest_requires__ = {
@@ -76,7 +76,6 @@ def _prepare_dnsmos(dnsmos_dir: str) -> None:
             f.write(myfile.content)
 
 
-@lru_cache
 def _load_session(
     path: str,
     device: torch.device,
@@ -116,6 +115,9 @@ def _load_session(
         infs = InferenceSession(path, providers=["CPUExecutionProvider"], sess_options=opts)
 
     return infs
+
+
+_cached_load_session = lru_cache()(_load_session)
 
 
 def _audio_melspec(
@@ -180,7 +182,12 @@ def _polyfit_val(mos: np.ndarray, personalized: bool) -> np.ndarray:
 
 
 def deep_noise_suppression_mean_opinion_score(
-    preds: Tensor, fs: int, personalized: bool, device: Optional[str] = None, num_threads: Optional[int] = None
+    preds: Tensor,
+    fs: int,
+    personalized: bool,
+    device: Optional[str] = None,
+    num_threads: Optional[int] = None,
+    cache_session: bool = True,
 ) -> Tensor:
     """Calculate `Deep Noise Suppression performance evaluation based on Mean Opinion Score`_ (DNSMOS).
 
@@ -206,6 +213,9 @@ def deep_noise_suppression_mean_opinion_score(
         device: the device used for calculating DNSMOS, can be cpu or cuda:n, where n is the index of gpu.
             If None is given, then the device of input is used.
         num_threads: the number of threads to use for cpu inference. Defaults to None.
+        cache_session: whether to cache the onnx session. By default this is true, meaning that repeated calls to this
+            method is faster than if this was set to False, the consequence is that the session will be cached in
+            memory until the process is terminated.
 
     Returns:
         Float tensor with shape ``(...,4)`` of DNSMOS values per sample, i.e. [p808_mos, mos_sig, mos_bak, mos_ovr]
@@ -229,8 +239,11 @@ def deep_noise_suppression_mean_opinion_score(
         )
     device = torch.device(device) if device is not None else preds.device
 
-    onnx_sess = _load_session(f"{DNSMOS_DIR}/{'p' if personalized else ''}DNSMOS/sig_bak_ovr.onnx", device, num_threads)
-    p808_onnx_sess = _load_session(f"{DNSMOS_DIR}/DNSMOS/model_v8.onnx", device, num_threads)
+    _load_session_function = _cached_load_session if cache_session else _load_session
+    onnx_sess = _load_session_function(
+        f"{DNSMOS_DIR}/{'p' if personalized else ''}DNSMOS/sig_bak_ovr.onnx", device, num_threads
+    )
+    p808_onnx_sess = _load_session_function(f"{DNSMOS_DIR}/DNSMOS/model_v8.onnx", device, num_threads)
 
     desired_fs = SAMPLING_RATE
     if fs != desired_fs:
@@ -273,6 +286,6 @@ def deep_noise_suppression_mean_opinion_score(
         )
         mos_np = _polyfit_val(mos_np, personalized)
 
-        mos_np = mos_np.reshape(shape[:-1] + (4,))
+        mos_np = mos_np.reshape((*shape[:-1], 4))
         moss.append(mos_np)
     return torch.from_numpy(np.mean(np.stack(moss, axis=-1), axis=-1))  # [p808_mos, mos_sig, mos_bak, mos_ovr]

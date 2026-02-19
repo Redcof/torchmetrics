@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from itertools import permutations
-from typing import Any, Callable, Tuple
+from typing import Any, Callable
 
 import numpy as np
 import torch
@@ -42,7 +42,7 @@ def _gen_permutations(spk_num: int, device: torch.device) -> Tensor:
 def _find_best_perm_by_linear_sum_assignment(
     metric_mtx: Tensor,
     eval_func: Callable,
-) -> Tuple[Tensor, Tensor]:
+) -> tuple[Tensor, Tensor]:
     """Solves the linear sum assignment problem.
 
     This implementation uses scipy and input is therefore transferred to cpu during calculations.
@@ -68,7 +68,7 @@ def _find_best_perm_by_linear_sum_assignment(
 def _find_best_perm_by_exhaustive_method(
     metric_mtx: Tensor,
     eval_func: Callable,
-) -> Tuple[Tensor, Tensor]:
+) -> tuple[Tensor, Tensor]:
     """Solves the linear sum assignment problem using exhaustive method.
 
     This is done by exhaustively calculating the metric values of all possible permutations, and returns the best metric
@@ -111,7 +111,7 @@ def permutation_invariant_training(
     mode: Literal["speaker-wise", "permutation-wise"] = "speaker-wise",
     eval_func: Literal["max", "min"] = "max",
     **kwargs: Any,
-) -> Tuple[Tensor, Tensor]:
+) -> tuple[Tensor, Tensor]:
     """Calculate `Permutation invariant training`_ (PIT).
 
     This metric can evaluate models for speaker independent multi-talker speech separation in a permutation
@@ -179,7 +179,7 @@ def permutation_invariant_training(
         )
         ptarget = target.repeat_interleave(repeats=perm_num, dim=0)
         # shape of metric_of_ps [batch_size*perm_num] or [batch_size*perm_num, spk_num]
-        metric_of_ps = metric_func(ppreds, ptarget)
+        metric_of_ps = metric_func(ppreds, ptarget, **kwargs)
         metric_of_ps = torch.mean(metric_of_ps.reshape(batch_size, len(perms), -1), dim=-1)
         # find the best metric and best permutation
         best_metric, best_indexes = eval_op(metric_of_ps, dim=1)

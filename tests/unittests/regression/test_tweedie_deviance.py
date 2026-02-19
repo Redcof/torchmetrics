@@ -17,9 +17,9 @@ import pytest
 import torch
 from sklearn.metrics import mean_tweedie_deviance
 from torch import Tensor
+
 from torchmetrics.functional.regression.tweedie_deviance import tweedie_deviance_score
 from torchmetrics.regression.tweedie_deviance import TweedieDevianceScore
-
 from unittests import BATCH_SIZE, NUM_BATCHES, _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -51,7 +51,7 @@ def _reference_sklearn_deviance(preds: Tensor, targets: Tensor, power: float):
 
 @pytest.mark.parametrize("power", [-0.5, 0, 1, 1.5, 2, 3])
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [
         (_single_target_inputs2.preds, _single_target_inputs2.target),
         (_single_target_inputs1.preds, _single_target_inputs1.target),

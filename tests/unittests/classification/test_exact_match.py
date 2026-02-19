@@ -17,10 +17,11 @@ import numpy as np
 import pytest
 import torch
 from scipy.special import expit as sigmoid
+
 from torchmetrics.classification.exact_match import ExactMatch, MulticlassExactMatch, MultilabelExactMatch
 from torchmetrics.functional.classification.exact_match import multiclass_exact_match, multilabel_exact_match
 from torchmetrics.metric import Metric
-
+from torchmetrics.utilities.imports import _TORCH_GREATER_EQUAL_2_1
 from unittests import NUM_CLASSES, THRESHOLD
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester, inject_ignore_index
@@ -121,8 +122,8 @@ class TestMulticlassExactMatch(MetricTester):
         """Test dtype support of the metric on CPU."""
         preds, target = inputs
 
-        if (preds < 0).any() and dtype == torch.half:
-            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision")
+        if not _TORCH_GREATER_EQUAL_2_1 and (preds < 0).any() and dtype == torch.half:
+            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision for torch<2.1")
         self.run_precision_test_cpu(
             preds=preds,
             target=target,
@@ -159,7 +160,8 @@ def _reference_exact_match_multilabel(preds, target, ignore_index, multidim_aver
 
     if ignore_index is not None:
         target = np.copy(target)
-        target[target == ignore_index] = -1
+        mask = target == ignore_index
+        target = np.where(mask, preds, target)
 
     if multidim_average == "global":
         preds = np.moveaxis(preds, 1, -1).reshape(-1, NUM_CLASSES)
@@ -250,8 +252,8 @@ class TestMultilabelExactMatch(MetricTester):
         """Test dtype support of the metric on CPU."""
         preds, target = inputs
 
-        if (preds < 0).any() and dtype == torch.half:
-            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision")
+        if not _TORCH_GREATER_EQUAL_2_1 and (preds < 0).any() and dtype == torch.half:
+            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision for torch<2.1")
         self.run_precision_test_cpu(
             preds=preds,
             target=target,

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 from torch import Tensor
@@ -42,7 +42,7 @@ def _multiclass_exact_match_update(
     target: Tensor,
     multidim_average: Literal["global", "samplewise"] = "global",
     ignore_index: Optional[int] = None,
-) -> Tuple[Tensor, Tensor]:
+) -> tuple[Tensor, Tensor]:
     """Compute the statistics."""
     if ignore_index is not None:
         preds = preds.clone()
@@ -122,9 +122,17 @@ def multiclass_exact_match(
 
 
 def _multilabel_exact_match_update(
-    preds: Tensor, target: Tensor, num_labels: int, multidim_average: Literal["global", "samplewise"] = "global"
-) -> Tuple[Tensor, Tensor]:
+    preds: Tensor,
+    target: Tensor,
+    num_labels: int,
+    multidim_average: Literal["global", "samplewise"] = "global",
+    ignore_index: Optional[int] = None,
+) -> tuple[Tensor, Tensor]:
     """Compute the statistics."""
+    if ignore_index is not None:
+        mask = target == -1
+        target = torch.where(mask, preds.long(), target)
+
     if multidim_average == "global":
         preds = torch.movedim(preds, 1, -1).reshape(-1, num_labels)
         target = torch.movedim(target, 1, -1).reshape(-1, num_labels)
@@ -207,7 +215,7 @@ def multilabel_exact_match(
         _multilabel_stat_scores_arg_validation(num_labels, threshold, average, multidim_average, ignore_index)
         _multilabel_stat_scores_tensor_validation(preds, target, num_labels, multidim_average, ignore_index)
     preds, target = _multilabel_stat_scores_format(preds, target, num_labels, threshold, ignore_index)
-    correct, total = _multilabel_exact_match_update(preds, target, num_labels, multidim_average)
+    correct, total = _multilabel_exact_match_update(preds, target, num_labels, multidim_average, ignore_index)
     return _exact_match_reduce(correct, total)
 
 

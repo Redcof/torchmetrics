@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from collections.abc import Sequence
 from copy import deepcopy
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import Any, Optional, Union, cast
 
 import torch
 from lightning_utilities import apply_to_collection
@@ -31,7 +32,7 @@ if not _MATPLOTLIB_AVAILABLE:
 def _bootstrap_sampler(
     size: int,
     sampling_strategy: str = "poisson",
-) -> Tensor:
+) -> torch.Tensor:
     """Resample a tensor along its first dimension with replacement.
 
     Args:
@@ -128,8 +129,8 @@ class BootStrapper(WrapperMetric):
         Any tensor passed in will be bootstrapped along dimension 0.
 
         """
-        args_sizes = apply_to_collection(args, Tensor, len)
-        kwargs_sizes = apply_to_collection(kwargs, Tensor, len)
+        args_sizes = apply_to_collection(args, torch.Tensor, len)
+        kwargs_sizes = apply_to_collection(kwargs, torch.Tensor, len)
         if len(args_sizes) > 0:
             size = args_sizes[0]
         elif len(kwargs_sizes) > 0:
@@ -141,18 +142,18 @@ class BootStrapper(WrapperMetric):
             sample_idx = _bootstrap_sampler(size, sampling_strategy=self.sampling_strategy).to(self.device)
             if sample_idx.numel() == 0:
                 continue
-            new_args = apply_to_collection(args, Tensor, torch.index_select, dim=0, index=sample_idx)
-            new_kwargs = apply_to_collection(kwargs, Tensor, torch.index_select, dim=0, index=sample_idx)
-            self.metrics[idx].update(*new_args, **new_kwargs)
+            new_args = apply_to_collection(args, torch.Tensor, torch.index_select, dim=0, index=sample_idx)
+            new_kwargs = apply_to_collection(kwargs, torch.Tensor, torch.index_select, dim=0, index=sample_idx)
+            self.metrics[idx].update(*new_args, **new_kwargs)  # type: ignore[operator]  # needed for mypy
 
-    def compute(self) -> Dict[str, Tensor]:
+    def compute(self) -> dict[str, Tensor]:
         """Compute the bootstrapped metric values.
 
         Always returns a dict of tensors, which can contain the following keys: ``mean``, ``std``, ``quantile`` and
         ``raw`` depending on how the class was initialized.
 
         """
-        computed_vals = torch.stack([m.compute() for m in self.metrics], dim=0)
+        computed_vals = torch.stack([cast(Metric, m).compute() for m in self.metrics], dim=0)
         output_dict = {}
         if self.mean:
             output_dict["mean"] = computed_vals.mean(dim=0)
@@ -171,6 +172,7 @@ class BootStrapper(WrapperMetric):
     def reset(self) -> None:
         """Reset the state of the base metric."""
         for m in self.metrics:
+            m = cast(Metric, m)
             m.reset()
         super().reset()
 

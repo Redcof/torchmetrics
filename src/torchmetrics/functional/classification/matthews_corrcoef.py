@@ -51,10 +51,11 @@ def _matthews_corrcoef_reduce(confmat: Tensor) -> Tensor:
         if tp + tn == 0 and fp + fn != 0:
             return torch.tensor(-1.0, dtype=confmat.dtype, device=confmat.device)
 
-    tk = confmat.sum(dim=-1).float()
-    pk = confmat.sum(dim=-2).float()
-    c = torch.trace(confmat).float()
-    s = confmat.sum().float()
+    confmat = confmat.float()
+    tk = confmat.sum(dim=-1)
+    pk = confmat.sum(dim=-2)
+    c = torch.trace(confmat)
+    s = confmat.sum()
 
     cov_ytyp = c * s - sum(tk * pk)
     cov_ypyp = s**2 - sum(pk * pk)
@@ -64,16 +65,23 @@ def _matthews_corrcoef_reduce(confmat: Tensor) -> Tensor:
     denom = cov_ypyp * cov_ytyt
 
     if denom == 0 and confmat.numel() == 4:
-        if fn == 0 and tn == 0:
-            a, b = tp, fp
-        elif fp == 0 and tn == 0:
-            a, b = tp, fn
-        elif tp == 0 and fn == 0:
-            a, b = tn, fp
-        elif tp == 0 and fp == 0:
-            a, b = tn, fn
         eps = torch.tensor(torch.finfo(torch.float32).eps, dtype=torch.float32, device=confmat.device)
-        numerator = torch.sqrt(eps) * (a - b)
+        if fn == 0 and tn == 0:
+            numerator = torch.sqrt(eps) * (tp - fp)
+        elif fp == 0 and tn == 0:
+            numerator = torch.sqrt(eps) * (tp - fn)
+        elif tp == 0 and fn == 0:
+            numerator = torch.sqrt(eps) * (tn - fp)
+        elif tp == 0 and fp == 0:
+            numerator = torch.sqrt(eps) * (tn - fn)
+        elif tp == 0:
+            numerator = tn - fp * fn
+        elif tn == 0:
+            numerator = tp - fp * fn
+        elif fp == 0 or fn == 0:
+            numerator = tp * tn
+        else:
+            return torch.tensor(0, dtype=confmat.dtype, device=confmat.device)
         denom = (tp + fp + eps) * (tp + fn + eps) * (tn + fp + eps) * (tn + fn + eps)
     elif denom == 0:
         return torch.tensor(0, dtype=confmat.dtype, device=confmat.device)
@@ -261,7 +269,7 @@ def matthews_corrcoef(
     This metric measures the general correlation or quality of a classification.
 
     This function is a simple wrapper to get the task specific versions of this metric, which is done by setting the
-    ``task`` argument to either ``'binary'``, ``'multiclass'`` or ``multilabel``. See the documentation of
+    ``task`` argument to either ``'binary'``, ``'multiclass'`` or ``'multilabel'``. See the documentation of
     :func:`~torchmetrics.functional.classification.binary_matthews_corrcoef`,
     :func:`~torchmetrics.functional.classification.multiclass_matthews_corrcoef` and
     :func:`~torchmetrics.functional.classification.multilabel_matthews_corrcoef` for

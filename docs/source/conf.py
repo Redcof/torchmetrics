@@ -18,8 +18,9 @@ import sys
 from typing import Optional
 
 import lai_sphinx_theme
-import torchmetrics
 from lightning_utilities.docs.formatting import _linkcode_resolve, _transform_changelog
+
+import torchmetrics
 
 _PATH_HERE = os.path.abspath(os.path.dirname(__file__))
 _PATH_ROOT = os.path.realpath(os.path.join(_PATH_HERE, "..", ".."))
@@ -220,7 +221,6 @@ html_logo = "_static/images/logo.svg"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
-html_js_files = ["runllm.js"]
 
 # -- Options for HTMLHelp output ---------------------------------------------
 
@@ -304,6 +304,11 @@ intersphinx_mapping = {
     "matplotlib": ("https://matplotlib.org/stable/", None),
 }
 nitpicky = True
+
+nitpick_ignore = [
+    ("py:class", "typing.Self"),
+    ("py:data", "typing.Union"),
+]
 
 # -- Options for to-do extension ----------------------------------------------
 
@@ -447,7 +452,15 @@ linkcheck_ignore = [
     "https://aclanthology.org/W17-4770",
     # A wavelet transform method to merge Landsat TM and SPOT panchromatic data
     "https://www.ingentaconnect.com/content/tandf/tres/1998/00000019/00000004/art00013",
+    # Improved normalization of time-lapse seismic data using normalized root mean square repeatability data ...
+    # ... to improve automatic production and seismic history matching in the Nelson field
+    "https://onlinelibrary.wiley.com/doi/abs/10.1111/1365-2478.12109",
+    # Multiscale structural similarity for image quality assessment
+    "https://ieeexplore.ieee.org/abstract/document/1292216",
     # todo: these links seems to be unstable, referring to .devcontainer
     "https://code.visualstudio.com",
     "https://code.visualstudio.com/.*",
+    # Ignore Medium articles which return 403 to automated clients
+    # Mean-Average-Precision (mAP) and Mean-Average-Recall (mAR)
+    "https://jonathan-hui.medium.com/map-mean-average-precision-for-object-detection-45c121a31173",
 ]

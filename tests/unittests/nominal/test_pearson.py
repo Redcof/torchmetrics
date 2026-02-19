@@ -16,12 +16,12 @@ import itertools
 import pandas as pd
 import pytest
 import torch
+
 from torchmetrics.functional.nominal.pearson import (
     pearsons_contingency_coefficient,
     pearsons_contingency_coefficient_matrix,
 )
 from torchmetrics.nominal.pearson import PearsonsContingencyCoefficient
-
 from unittests import BATCH_SIZE, NUM_BATCHES, _Input
 from unittests._helpers.testers import MetricTester
 
@@ -39,7 +39,7 @@ _input_logits = _Input(
 # No testing with replacing NaN's values is done as not supported in SciPy
 
 
-@pytest.fixture()
+@pytest.fixture
 def pearson_matrix_input():
     """Define input in matrix format for the metric."""
     return torch.cat(
@@ -76,7 +76,7 @@ def _reference_pd_pearsons_t_matrix(matrix):
 
 
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [
         (_input_default.preds, _input_default.target),
         (_input_logits.preds, _input_logits.target),

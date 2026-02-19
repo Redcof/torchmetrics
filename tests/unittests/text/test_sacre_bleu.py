@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections.abc import Sequence
 from functools import partial
-from typing import Sequence
 
 import pytest
 from lightning_utilities.core.imports import RequirementCache
 from torch import Tensor, tensor
+
 from torchmetrics.functional.text.sacre_bleu import AVAILABLE_TOKENIZERS, _TokenizersLiteral, sacre_bleu_score
 from torchmetrics.text.sacre_bleu import SacreBLEUScore
-
 from unittests._helpers import skip_on_connection_issues
 from unittests.text._helpers import TextTester
 from unittests.text._inputs import _inputs_multiple_references
@@ -42,10 +42,10 @@ def _reference_sacre_bleu(
 
 
 @pytest.mark.parametrize(
-    ["preds", "targets"],
+    ("preds", "targets"),
     [(_inputs_multiple_references.preds, _inputs_multiple_references.target)],
 )
-@pytest.mark.parametrize(["lowercase"], [(False,), (True,)])
+@pytest.mark.parametrize("lowercase", [False, True])
 @pytest.mark.parametrize("tokenize", AVAILABLE_TOKENIZERS)
 class TestSacreBLEUScore(TextTester):
     """Test class for `SacreBLEUScore` metric."""

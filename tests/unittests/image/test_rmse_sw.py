@@ -18,9 +18,9 @@ import pytest
 import sewar
 import torch
 from torch import Tensor
+
 from torchmetrics.functional import root_mean_squared_error_using_sliding_window
 from torchmetrics.image import RootMeanSquaredErrorUsingSlidingWindow
-
 from unittests import BATCH_SIZE, NUM_BATCHES
 from unittests._helpers.testers import MetricTester
 
@@ -56,7 +56,7 @@ def _reference_sewar_rmse_sw(preds, target, window_size):
     return rmse_mean
 
 
-@pytest.mark.parametrize("preds, target, window_size", [(i.preds, i.target, i.window_size) for i in _inputs])
+@pytest.mark.parametrize(("preds", "target", "window_size"), [(i.preds, i.target, i.window_size) for i in _inputs])
 class TestRootMeanSquareErrorWithSlidingWindow(MetricTester):
     """Testing of Root Mean Square Error With Sliding Window."""
 

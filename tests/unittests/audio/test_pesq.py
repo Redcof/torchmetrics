@@ -18,9 +18,9 @@ import torch
 from pesq import pesq as pesq_backend
 from scipy.io import wavfile
 from torch import Tensor
+
 from torchmetrics.audio import PerceptualEvaluationSpeechQuality
 from torchmetrics.functional.audio import perceptual_evaluation_speech_quality
-
 from unittests import _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -55,7 +55,7 @@ def _reference_pesq_batch(preds: Tensor, target: Tensor, fs: int, mode: str):
 
 
 @pytest.mark.parametrize(
-    "preds, target, ref_metric, fs, mode",
+    ("preds", "target", "ref_metric", "fs", "mode"),
     [
         (inputs_8k.preds, inputs_8k.target, partial(_reference_pesq_batch, fs=8000, mode="nb"), 8000, "nb"),
         (inputs_16k.preds, inputs_16k.target, partial(_reference_pesq_batch, fs=16000, mode="nb"), 16000, "nb"),

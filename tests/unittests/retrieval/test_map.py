@@ -15,12 +15,13 @@ from typing import Callable, Optional, Union
 
 import numpy as np
 import pytest
+import torch
 from sklearn.metrics import average_precision_score as sk_average_precision_score
 from torch import Tensor
-from torchmetrics.functional.retrieval.average_precision import retrieval_average_precision
-from torchmetrics.retrieval.average_precision import RetrievalMAP
 from typing_extensions import Literal
 
+from torchmetrics.functional.retrieval.average_precision import retrieval_average_precision
+from torchmetrics.retrieval.average_precision import RetrievalMAP
 from unittests._helpers import seed_all
 from unittests.retrieval.helpers import (
     RetrievalMetricTester,
@@ -178,3 +179,12 @@ class TestMAP(RetrievalMetricTester):
             exception_type=ValueError,
             kwargs_update=metric_args,
         )
+
+    def test_map_all_zero_predictions_returns_zero(self):
+        """Test that MAP returns 0 when all predictions are zero and there are positive targets."""
+        preds = torch.tensor([0.0, 0.0, 0.0])
+        target = torch.tensor([1, 0, 1])
+        indexes = torch.tensor([0, 0, 0])
+        metric = RetrievalMAP()
+        result = metric(preds, target, indexes=indexes)
+        assert result == 0.0, f"Expected MAP to be 0.0, got {result}"

@@ -13,27 +13,23 @@
 # limitations under the License.
 
 from functools import partial
+from typing import Optional
 
 import pytest
 import torch
 from monai.metrics.meaniou import compute_iou
+
 from torchmetrics.functional.segmentation.mean_iou import mean_iou
 from torchmetrics.segmentation.mean_iou import MeanIoU
-
-from unittests import BATCH_SIZE, NUM_BATCHES, NUM_CLASSES, _Input
+from unittests import NUM_CLASSES
 from unittests._helpers.testers import MetricTester
-
-_inputs1 = _Input(
-    preds=torch.randint(0, 2, (NUM_BATCHES, BATCH_SIZE, NUM_CLASSES, 16)),
-    target=torch.randint(0, 2, (NUM_BATCHES, BATCH_SIZE, NUM_CLASSES, 16)),
-)
-_inputs2 = _Input(
-    preds=torch.randint(0, 2, (NUM_BATCHES, BATCH_SIZE, NUM_CLASSES, 32, 32)),
-    target=torch.randint(0, 2, (NUM_BATCHES, BATCH_SIZE, NUM_CLASSES, 32, 32)),
-)
-_inputs3 = _Input(
-    preds=torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32)),
-    target=torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32)),
+from unittests.segmentation.inputs import (
+    _index_input_1,
+    _mixed_input_1,
+    _mixed_input_2,
+    _mixed_logits_input,
+    _one_hot_input_1,
+    _one_hot_input_2,
 )
 
 
@@ -41,14 +37,26 @@ def _reference_mean_iou(
     preds: torch.Tensor,
     target: torch.Tensor,
     input_format: str,
+    num_classes: Optional[int],
     include_background: bool = True,
     per_class: bool = True,
     reduce: bool = True,
 ):
     """Calculate reference metric for `MeanIoU`."""
     if input_format == "index":
-        preds = torch.nn.functional.one_hot(preds, num_classes=NUM_CLASSES).movedim(-1, 1)
-        target = torch.nn.functional.one_hot(target, num_classes=NUM_CLASSES).movedim(-1, 1)
+        preds = torch.nn.functional.one_hot(preds, num_classes=num_classes).movedim(-1, 1)
+        target = torch.nn.functional.one_hot(target, num_classes=num_classes).movedim(-1, 1)
+    elif input_format == "mixed":
+        if preds.dim() == (target.dim() + 1):
+            if torch.is_floating_point(preds):
+                preds = preds.argmax(dim=1)
+                preds = torch.nn.functional.one_hot(preds, num_classes=NUM_CLASSES).movedim(-1, 1)
+            target = torch.nn.functional.one_hot(target, num_classes=NUM_CLASSES).movedim(-1, 1)
+        elif (preds.dim() + 1) == target.dim():
+            if torch.is_floating_point(target):
+                target = target.argmax(dim=1)
+                target = torch.nn.functional.one_hot(target, num_classes=NUM_CLASSES).movedim(-1, 1)
+            preds = torch.nn.functional.one_hot(preds, num_classes=NUM_CLASSES).movedim(-1, 1)
 
     val = compute_iou(preds, target, include_background=include_background)
     val[torch.isnan(val)] = 0.0
@@ -58,11 +66,17 @@ def _reference_mean_iou(
 
 
 @pytest.mark.parametrize(
-    "preds, target, input_format",
+    ("preds", "target", "input_format", "num_classes"),
     [
-        (_inputs1.preds, _inputs1.target, "one-hot"),
-        (_inputs2.preds, _inputs2.target, "one-hot"),
-        (_inputs3.preds, _inputs3.target, "index"),
+        (_one_hot_input_1.preds, _one_hot_input_1.target, "one-hot", NUM_CLASSES),
+        (_one_hot_input_2.preds, _one_hot_input_2.target, "one-hot", NUM_CLASSES),
+        (_one_hot_input_1.preds, _one_hot_input_1.target, "one-hot", None),
+        (_one_hot_input_2.preds, _one_hot_input_2.target, "one-hot", None),
+        (_index_input_1.preds, _index_input_1.target, "index", NUM_CLASSES),
+        (_index_input_1.preds, _index_input_1.target, "index", None),
+        (_mixed_input_1.preds, _mixed_input_1.target, "mixed", NUM_CLASSES),
+        (_mixed_input_2.preds, _mixed_input_2.target, "mixed", NUM_CLASSES),
+        (_mixed_logits_input.preds, _mixed_logits_input.target, "mixed", NUM_CLASSES),
     ],
 )
 @pytest.mark.parametrize("include_background", [True, False])
@@ -73,8 +87,15 @@ class TestMeanIoU(MetricTester):
 
     @pytest.mark.parametrize("ddp", [pytest.param(True, marks=pytest.mark.DDP), False])
     @pytest.mark.parametrize("per_class", [True, False])
-    def test_mean_iou_class(self, preds, target, input_format, include_background, per_class, ddp):
+    def test_mean_iou_class(self, preds, target, input_format, num_classes, include_background, per_class, ddp):
         """Test class implementation of metric."""
+        if input_format in ["index", "mixed"] and num_classes is None:
+            with pytest.raises(
+                ValueError, match="Argument `num_classes` must be provided when `input_format` is 'index'."
+            ):
+                MeanIoU(num_classes=None, input_format="index")
+            return
+
         self.run_class_metric_test(
             ddp=ddp,
             preds=preds,
@@ -83,31 +104,96 @@ class TestMeanIoU(MetricTester):
             reference_metric=partial(
                 _reference_mean_iou,
                 input_format=input_format,
+                num_classes=num_classes,
                 include_background=include_background,
                 per_class=per_class,
                 reduce=True,
             ),
             metric_args={
-                "num_classes": NUM_CLASSES,
+                "num_classes": num_classes,
                 "include_background": include_background,
                 "per_class": per_class,
                 "input_format": input_format,
             },
         )
 
-    def test_mean_iou_functional(self, preds, target, input_format, include_background):
+    def test_mean_iou_functional(self, preds, target, input_format, num_classes, include_background):
         """Test functional implementation of metric."""
+        if input_format == "index" and num_classes is None:
+            with pytest.raises(
+                ValueError, match="Argument `num_classes` must be provided when `input_format` is 'index'."
+            ):
+                mean_iou(preds, target, num_classes=None, input_format="index")
+            return
+
         self.run_functional_metric_test(
             preds=preds,
             target=target,
             metric_functional=mean_iou,
             reference_metric=partial(
-                _reference_mean_iou, input_format=input_format, include_background=include_background, reduce=False
+                _reference_mean_iou,
+                input_format=input_format,
+                num_classes=num_classes,
+                include_background=include_background,
+                reduce=False,
             ),
             metric_args={
-                "num_classes": NUM_CLASSES,
+                "num_classes": num_classes,
                 "include_background": include_background,
                 "per_class": True,
                 "input_format": input_format,
             },
         )
+
+
+def test_mean_iou_absent_class():
+    """Test mean iou returns -1 for absent classes."""
+    metric = MeanIoU(num_classes=3, per_class=True, input_format="index")
+    target = torch.tensor([
+        [0, 1],
+        [1, 0],
+    ])
+    preds = torch.tensor([
+        [0, 1],
+        [1, 0],
+    ])
+    metric.update(preds, target)
+    miou_per_class = metric.compute()
+    functional_miou = mean_iou(preds, target, num_classes=3, per_class=True, input_format="index").mean(
+        dim=0
+    )  # reduce over batch dim
+    expected_ious = [1.0, 1.0, -1.0]
+    for idx, (iou, iou_func) in enumerate(zip(miou_per_class, functional_miou)):
+        assert iou == iou_func == expected_ious[idx]
+    # test that when reducing the nan is ignored and we dont get nan as output if class is absent
+    metric = MeanIoU(num_classes=3, per_class=False, input_format="index")
+    metric.update(preds, target)
+    miou_per_class = metric.compute()
+
+    miou_func = mean_iou(preds, target, num_classes=3, per_class=False, input_format="index").mean(
+        dim=0
+    )  # reduce over batch dim
+    assert miou_per_class.item() == miou_func.item() == 1.0
+
+
+def test_mean_iou_perfect_prediction():
+    """Test perfect IoU prediction and target."""
+    metric = MeanIoU(num_classes=3, per_class=True, input_format="index")
+    target = torch.tensor([
+        [0, 1],
+        [1, 0],
+        [2, 2],
+    ])
+    preds = torch.tensor([
+        [0, 1],
+        [1, 0],
+        [2, 2],
+    ])
+    metric.update(preds, target)
+    miou_per_class = metric.compute()
+    miou_func = mean_iou(preds, target, num_classes=3, per_class=True, input_format="index").mean(
+        dim=0
+    )  # reduce over batch dim
+    expected_ious = [1.0, 1.0, 1.0]
+    for idx, (iou, iou_func) in enumerate(zip(miou_per_class, miou_func)):
+        assert iou == iou_func == expected_ious[idx]

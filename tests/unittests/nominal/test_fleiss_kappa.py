@@ -17,9 +17,9 @@ import numpy as np
 import pytest
 import torch
 from statsmodels.stats.inter_rater import fleiss_kappa as sk_fleiss_kappa
+
 from torchmetrics.functional.nominal.fleiss_kappa import fleiss_kappa
 from torchmetrics.nominal.fleiss_kappa import FleissKappa
-
 from unittests import BATCH_SIZE, NUM_BATCHES, NUM_CLASSES
 from unittests._helpers.testers import MetricTester
 
@@ -65,7 +65,7 @@ def _random_counts(high, size):
 
 
 @pytest.mark.parametrize(
-    "preds, target, mode",
+    ("preds", "target", "mode"),
     [  # target is not used in any of the functions
         (
             _random_counts(high=NUM_RATERS, size=(NUM_BATCHES, BATCH_SIZE, NUM_CATEGORIES)),

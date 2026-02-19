@@ -16,9 +16,9 @@ from functools import partial
 
 import pytest
 from torch import Tensor, tensor
+
 from torchmetrics.functional.text.eed import extended_edit_distance
 from torchmetrics.text.eed import ExtendedEditDistance
-
 from unittests.text._helpers import TextTester
 from unittests.text._inputs import _inputs_single_reference, _inputs_single_sentence_multiple_references
 
@@ -45,7 +45,7 @@ def _reference_rwth_manual(preds, targets) -> Tensor:
 
 
 @pytest.mark.parametrize(
-    ["preds", "targets"],
+    ("preds", "targets"),
     [(_inputs_single_reference.preds, _inputs_single_reference.target)],
 )
 class TestExtendedEditDistance(TextTester):

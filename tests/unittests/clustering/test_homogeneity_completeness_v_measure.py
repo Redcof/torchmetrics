@@ -17,6 +17,7 @@ import pytest
 from sklearn.metrics import completeness_score as sklearn_completeness_score
 from sklearn.metrics import homogeneity_score as sklearn_homogeneity_score
 from sklearn.metrics import v_measure_score as sklearn_v_measure_score
+
 from torchmetrics.clustering.homogeneity_completeness_v_measure import (
     CompletenessScore,
     HomogeneityScore,
@@ -27,7 +28,6 @@ from torchmetrics.functional.clustering.homogeneity_completeness_v_measure impor
     homogeneity_score,
     v_measure_score,
 )
-
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
 from unittests.clustering._inputs import _float_inputs_extrinsic, _single_target_extrinsic1, _single_target_extrinsic2
@@ -41,7 +41,7 @@ def _reference_sklearn_wrapper(preds, target, fn):
 
 
 @pytest.mark.parametrize(
-    "modular_metric, functional_metric, reference_metric",
+    ("modular_metric", "functional_metric", "reference_metric"),
     [
         (HomogeneityScore, homogeneity_score, sklearn_homogeneity_score),
         (CompletenessScore, completeness_score, sklearn_completeness_score),
@@ -54,7 +54,7 @@ def _reference_sklearn_wrapper(preds, target, fn):
     ],
 )
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [
         (_single_target_extrinsic1.preds, _single_target_extrinsic1.target),
         (_single_target_extrinsic2.preds, _single_target_extrinsic2.target),

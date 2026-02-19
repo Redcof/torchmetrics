@@ -20,6 +20,7 @@ import torch
 from scipy.special import expit as sigmoid
 from scipy.special import softmax
 from sklearn.metrics import precision_recall_curve as sk_precision_recall_curve
+
 from torchmetrics.classification.recall_fixed_precision import (
     BinaryRecallAtFixedPrecision,
     MulticlassRecallAtFixedPrecision,
@@ -32,7 +33,7 @@ from torchmetrics.functional.classification.recall_fixed_precision import (
     multilabel_recall_at_fixed_precision,
 )
 from torchmetrics.metric import Metric
-
+from torchmetrics.utilities.imports import _TORCH_GREATER_EQUAL_2_1
 from unittests import NUM_CLASSES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester, inject_ignore_index, remove_ignore_index
@@ -48,7 +49,7 @@ def _recall_at_precision_x_multilabel(predictions, targets, min_precision):
         tuple_all = [(r, p, t) for p, r, t in zip(precision, recall, thresholds) if p >= min_precision]
         max_recall, _, best_threshold = max(tuple_all)
     except ValueError:
-        max_recall, best_threshold = 0, 1e6
+        max_recall, best_threshold = 0, float("nan")
 
     return float(max_recall), float(best_threshold)
 
@@ -62,7 +63,7 @@ def _reference_sklearn_recall_at_fixed_precision_binary(preds, target, min_preci
     return _recall_at_precision_x_multilabel(preds, target, min_precision)
 
 
-@pytest.mark.parametrize("inputs", (_binary_cases[1], _binary_cases[2], _binary_cases[4], _binary_cases[5]))
+@pytest.mark.parametrize("inputs", [_binary_cases[1], _binary_cases[2], _binary_cases[4], _binary_cases[5]])
 class TestBinaryRecallAtFixedPrecision(MetricTester):
     """Test class for `BinaryRecallAtFixedPrecision` metric."""
 
@@ -129,8 +130,8 @@ class TestBinaryRecallAtFixedPrecision(MetricTester):
     def test_binary_recall_at_fixed_precision_dtype_cpu(self, inputs, dtype):
         """Test dtype support of the metric on CPU."""
         preds, target = inputs
-        if (preds < 0).any() and dtype == torch.half:
-            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision")
+        if not _TORCH_GREATER_EQUAL_2_1 and (preds < 0).any() and dtype == torch.half:
+            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision for torch<2.1")
         self.run_precision_test_cpu(
             preds=preds,
             target=target,
@@ -186,7 +187,7 @@ def _reference_sklearn_recall_at_fixed_precision_multiclass(preds, target, min_p
 
 
 @pytest.mark.parametrize(
-    "inputs", (_multiclass_cases[1], _multiclass_cases[2], _multiclass_cases[4], _multiclass_cases[5])
+    "inputs", [_multiclass_cases[1], _multiclass_cases[2], _multiclass_cases[4], _multiclass_cases[5]]
 )
 class TestMulticlassRecallAtFixedPrecision(MetricTester):
     """Test class for `MulticlassRecallAtFixedPrecision` metric."""
@@ -310,7 +311,7 @@ def _reference_sklearn_recall_at_fixed_precision_multilabel(preds, target, min_p
 
 
 @pytest.mark.parametrize(
-    "inputs", (_multilabel_cases[1], _multilabel_cases[2], _multilabel_cases[4], _multilabel_cases[5])
+    "inputs", [_multilabel_cases[1], _multilabel_cases[2], _multilabel_cases[4], _multilabel_cases[5]]
 )
 class TestMultilabelRecallAtFixedPrecision(MetricTester):
     """Test class for `MultilabelRecallAtFixedPrecision` metric."""
@@ -456,3 +457,15 @@ def test_wrapper_class(metric, kwargs, base_metric=RecallAtFixedPrecision):
         instance = base_metric(**kwargs)
         assert isinstance(instance, metric)
         assert isinstance(instance, Metric)
+
+
+def test_binary_recall_at_fixed_precision_nan_threshold():
+    """If no threshold meets the min_precision condition, threshold should be NaN."""
+    preds = torch.tensor([0.1, 0.4, 0.9, 0.8])
+    target = torch.tensor([0, 0, 0, 0])  # all negatives → precision undefined / 0
+
+    metric = BinaryRecallAtFixedPrecision(min_precision=0.5)
+    recall, threshold = metric(preds, target)
+
+    assert recall == 0.0
+    assert torch.isnan(threshold), "Expected NaN when no precision condition is met"

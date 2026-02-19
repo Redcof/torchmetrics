@@ -19,11 +19,11 @@ import torch
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import r2_score as sk_r2score
 from torch import Tensor, tensor
+
 from torchmetrics import Metric
 from torchmetrics.classification import ConfusionMatrix, MulticlassAccuracy
 from torchmetrics.regression import R2Score
 from torchmetrics.wrappers.multioutput import MultioutputWrapper
-
 from unittests import BATCH_SIZE, NUM_BATCHES, NUM_CLASSES, _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -93,7 +93,7 @@ def _multi_target_sk_accuracy(preds, target, num_outputs):
 
 
 @pytest.mark.parametrize(
-    "base_metric_class, compare_metric, preds, target, num_outputs",
+    ("base_metric_class", "compare_metric", "preds", "target", "num_outputs"),
     [
         (
             R2Score,

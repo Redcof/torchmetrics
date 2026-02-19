@@ -18,10 +18,10 @@ import numpy as np
 import pytest
 import torch
 from torch import Tensor
+
 from torchmetrics.functional.image.d_lambda import spectral_distortion_index
 from torchmetrics.functional.image.uqi import universal_image_quality_index
 from torchmetrics.image.d_lambda import SpectralDistortionIndex
-
 from unittests import BATCH_SIZE, NUM_BATCHES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -83,7 +83,7 @@ def _reference_numpy_d_lambda(preds, target, p):
 
 
 @pytest.mark.parametrize(
-    "preds, target, p",
+    ("preds", "target", "p"),
     [(i.preds, i.target, i.p) for i in _inputs],
 )
 class TestSpectralDistortionIndex(MetricTester):

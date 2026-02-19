@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, List, Literal, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any, List, Literal, Optional, Union
 
 from torch import Tensor
 
@@ -73,7 +74,6 @@ class NormalizedMutualInfoScore(MutualInfoScore):
     plot_upper_bound: float = 0.0
     preds: List[Tensor]
     target: List[Tensor]
-    contingency: Tensor
 
     def __init__(
         self, average_method: Literal["min", "geometric", "arithmetic", "max"] = "arithmetic", **kwargs: Any

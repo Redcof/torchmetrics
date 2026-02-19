@@ -18,6 +18,7 @@ import pytest
 import torch
 from scipy.special import expit as sigmoid
 from sklearn.metrics import matthews_corrcoef as sk_matthews_corrcoef
+
 from torchmetrics.classification.matthews_corrcoef import (
     BinaryMatthewsCorrCoef,
     MatthewsCorrCoef,
@@ -25,12 +26,13 @@ from torchmetrics.classification.matthews_corrcoef import (
     MultilabelMatthewsCorrCoef,
 )
 from torchmetrics.functional.classification.matthews_corrcoef import (
+    _matthews_corrcoef_reduce,
     binary_matthews_corrcoef,
     multiclass_matthews_corrcoef,
     multilabel_matthews_corrcoef,
 )
 from torchmetrics.metric import Metric
-
+from torchmetrics.utilities.imports import _TORCH_GREATER_EQUAL_2_1
 from unittests import NUM_CLASSES, THRESHOLD
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester, inject_ignore_index, remove_ignore_index
@@ -105,8 +107,8 @@ class TestBinaryMatthewsCorrCoef(MetricTester):
     def test_binary_matthews_corrcoef_dtype_cpu(self, inputs, dtype):
         """Test dtype support of the metric on CPU."""
         preds, target = inputs
-        if (preds < 0).any() and dtype == torch.half:
-            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision")
+        if not _TORCH_GREATER_EQUAL_2_1 and (preds < 0).any() and dtype == torch.half:
+            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision for torch<2.1")
         self.run_precision_test_cpu(
             preds=preds,
             target=target,
@@ -287,8 +289,8 @@ class TestMultilabelMatthewsCorrCoef(MetricTester):
     def test_multilabel_matthews_corrcoef_dtype_cpu(self, inputs, dtype):
         """Test dtype support of the metric on CPU."""
         preds, target = inputs
-        if (preds < 0).any() and dtype == torch.half:
-            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision")
+        if not _TORCH_GREATER_EQUAL_2_1 and (preds < 0).any() and dtype == torch.half:
+            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision for torch<2.1")
         self.run_precision_test_cpu(
             preds=preds,
             target=target,
@@ -390,3 +392,26 @@ def test_wrapper_class(metric, kwargs, base_metric=MatthewsCorrCoef):
         instance = base_metric(**kwargs)
         assert isinstance(instance, metric)
         assert isinstance(instance, Metric)
+
+
+def test_matthews_corrcoef_reduce():
+    """Test the corner cases of extremely rare events."""
+    confmat_tp_zero = torch.tensor([[19392673, 1], [76216, 0]]).to(torch.bfloat16)
+    out_tp_zero = _matthews_corrcoef_reduce(confmat_tp_zero)
+    assert out_tp_zero != 0
+    assert not torch.isnan(out_tp_zero)
+
+    confmat_tn_zero = torch.tensor([[0, 1], [29690, 278]]).to(torch.bfloat16)
+    out_tn_zero = _matthews_corrcoef_reduce(confmat_tn_zero)
+    assert out_tn_zero != 0
+    assert not torch.isnan(out_tn_zero)
+
+    confmat_fp_zero = torch.tensor([[6931024, 0], [29690, 278]]).to(torch.bfloat16)
+    out_fp_zero = _matthews_corrcoef_reduce(confmat_fp_zero)
+    assert out_fp_zero != 0
+    assert not torch.isnan(out_fp_zero)
+
+    confmat_fn_zero = torch.tensor([[6931024, 29690], [0, 278]]).to(torch.bfloat16)
+    out_fn_zero = _matthews_corrcoef_reduce(confmat_fn_zero)
+    assert out_fn_zero != 0
+    assert not torch.isnan(out_fn_zero)

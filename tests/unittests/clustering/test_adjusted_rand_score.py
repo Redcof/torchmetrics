@@ -14,15 +14,15 @@
 import pytest
 import torch
 from sklearn.metrics import adjusted_rand_score as sklearn_adjusted_rand_score
+
 from torchmetrics.clustering.adjusted_rand_score import AdjustedRandScore
 from torchmetrics.functional.clustering.adjusted_rand_score import adjusted_rand_score
-
 from unittests._helpers.testers import MetricTester
 from unittests.clustering._inputs import _float_inputs_extrinsic, _single_target_extrinsic1, _single_target_extrinsic2
 
 
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [
         (_single_target_extrinsic1.preds, _single_target_extrinsic1.target),
         (_single_target_extrinsic2.preds, _single_target_extrinsic2.target),

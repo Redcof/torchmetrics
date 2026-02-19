@@ -40,8 +40,9 @@
 import os
 import re
 import tempfile
+from collections.abc import Sequence
 from functools import partial
-from typing import Any, ClassVar, Dict, Optional, Sequence, Type
+from typing import Any, ClassVar, Optional
 
 import torch
 from torch import Tensor, tensor
@@ -120,9 +121,9 @@ class _SacreBLEUTokenizer:
         import regex
 
         _INT_REGEX = (
-            # Separate out punctuations preceded by a non-digit
+            # Separate out punctuation preceded by a non-digit
             (regex.compile(r"(\P{N})(\p{P})"), r"\1 \2 "),
-            # Separate out punctuations followed by a non-digit
+            # Separate out punctuation followed by a non-digit
             (regex.compile(r"(\p{P})(\P{N})"), r" \1 \2"),
             # Separate out symbols
             (regex.compile(r"(\p{S})"), r" \1 "),
@@ -141,7 +142,7 @@ class _SacreBLEUTokenizer:
     }
 
     # Keep it as class variable to avoid initializing over and over again
-    sentencepiece_processors: ClassVar[Dict[str, Optional[Any]]] = {"flores101": None, "flores200": None}
+    sentencepiece_processors: ClassVar[dict[str, Optional[Any]]] = {"flores101": None, "flores200": None}
 
     def __init__(self, tokenize: _TokenizersLiteral, lowercase: bool = False) -> None:
         self._check_tokenizers_validity(tokenize)
@@ -155,7 +156,7 @@ class _SacreBLEUTokenizer:
 
     @classmethod
     def tokenize(
-        cls: Type["_SacreBLEUTokenizer"],
+        cls: type["_SacreBLEUTokenizer"],
         line: str,
         tokenize: _TokenizersLiteral,
         lowercase: bool = False,
@@ -167,7 +168,7 @@ class _SacreBLEUTokenizer:
         return cls._lower(tokenized_line, lowercase).split()
 
     @classmethod
-    def _tokenize_regex(cls: Type["_SacreBLEUTokenizer"], line: str) -> str:
+    def _tokenize_regex(cls: type["_SacreBLEUTokenizer"], line: str) -> str:
         """Post-processing tokenizer for `13a` and `zh` tokenizers.
 
         Args:
@@ -196,7 +197,7 @@ class _SacreBLEUTokenizer:
         return any(start <= uchar <= end for start, end in _UCODE_RANGES)
 
     @classmethod
-    def _tokenize_base(cls: Type["_SacreBLEUTokenizer"], line: str) -> str:
+    def _tokenize_base(cls: type["_SacreBLEUTokenizer"], line: str) -> str:
         """Tokenizes an input line with the tokenizer.
 
         Args:
@@ -209,7 +210,7 @@ class _SacreBLEUTokenizer:
         return line
 
     @classmethod
-    def _tokenize_13a(cls: Type["_SacreBLEUTokenizer"], line: str) -> str:
+    def _tokenize_13a(cls: type["_SacreBLEUTokenizer"], line: str) -> str:
         """Tokenizes a line using a relatively minimal tokenization that is equivalent to mteval-v13a, used by WMT.
 
         Args:
@@ -233,7 +234,7 @@ class _SacreBLEUTokenizer:
         return cls._tokenize_regex(f" {line} ")
 
     @classmethod
-    def _tokenize_zh(cls: Type["_SacreBLEUTokenizer"], line: str) -> str:
+    def _tokenize_zh(cls: type["_SacreBLEUTokenizer"], line: str) -> str:
         """Tokenization of Chinese text.
 
         This is done in two steps: separate each Chinese characters (by utf-8 encoding) and afterwards tokenize the
@@ -261,7 +262,7 @@ class _SacreBLEUTokenizer:
         return cls._tokenize_regex(line_in_chars)
 
     @classmethod
-    def _tokenize_international(cls: Type["_SacreBLEUTokenizer"], line: str) -> str:
+    def _tokenize_international(cls: type["_SacreBLEUTokenizer"], line: str) -> str:
         r"""Tokenizes a string following the official BLEU implementation.
 
         See github.com/moses-smt/mosesdecoder/blob/master/scripts/generic/mteval-v14.pl#L954-L983
@@ -270,7 +271,7 @@ class _SacreBLEUTokenizer:
         We just tokenize on punctuation and symbols,
         except when a punctuation is preceded and followed by a digit
         (e.g. a comma/dot as a thousand/decimal separator).
-        We do not recover escaped forms of punctuations such as &apos; or &gt;
+        We do not recover escaped forms of punctuation such as &apos; or &gt;
         as these should never appear in MT system outputs (see issue #138)
 
         Note that a number (e.g., a year) followed by a dot at the end of
@@ -294,7 +295,7 @@ class _SacreBLEUTokenizer:
         return " ".join(line.split())
 
     @classmethod
-    def _tokenize_char(cls: Type["_SacreBLEUTokenizer"], line: str) -> str:
+    def _tokenize_char(cls: type["_SacreBLEUTokenizer"], line: str) -> str:
         """Tokenizes all the characters in the input line.
 
         Args:
@@ -307,7 +308,7 @@ class _SacreBLEUTokenizer:
         return " ".join(char for char in line)
 
     @classmethod
-    def _tokenize_ja_mecab(cls: Type["_SacreBLEUTokenizer"], line: str) -> str:
+    def _tokenize_ja_mecab(cls: type["_SacreBLEUTokenizer"], line: str) -> str:
         """Tokenizes a Japanese string line using MeCab morphological analyzer.
 
         Args:
@@ -326,7 +327,7 @@ class _SacreBLEUTokenizer:
         return tagger.parse(line).strip()
 
     @classmethod
-    def _tokenize_ko_mecab(cls: Type["_SacreBLEUTokenizer"], line: str) -> str:
+    def _tokenize_ko_mecab(cls: type["_SacreBLEUTokenizer"], line: str) -> str:
         """Tokenizes a Korean string line using MeCab-korean morphological analyzer.
 
         Args:
@@ -346,7 +347,7 @@ class _SacreBLEUTokenizer:
 
     @classmethod
     def _tokenize_flores(
-        cls: Type["_SacreBLEUTokenizer"], line: str, tokenize: Literal["flores101", "flores200"]
+        cls: type["_SacreBLEUTokenizer"], line: str, tokenize: Literal["flores101", "flores200"]
     ) -> str:
         """Tokenizes a string line using sentencepiece tokenizer.
 
@@ -372,7 +373,7 @@ class _SacreBLEUTokenizer:
         return " ".join(cls.sentencepiece_processors[tokenize].EncodeAsPieces(line))  # type: ignore[union-attr]
 
     @classmethod
-    def _tokenize_flores_101(cls: Type["_SacreBLEUTokenizer"], line: str) -> str:
+    def _tokenize_flores_101(cls: type["_SacreBLEUTokenizer"], line: str) -> str:
         """Tokenizes a string line using sentencepiece tokenizer according to `FLORES-101`_ dataset.
 
         Args:
@@ -385,7 +386,7 @@ class _SacreBLEUTokenizer:
         return cls._tokenize_flores(line, "flores101")
 
     @classmethod
-    def _tokenize_flores_200(cls: Type["_SacreBLEUTokenizer"], line: str) -> str:
+    def _tokenize_flores_200(cls: type["_SacreBLEUTokenizer"], line: str) -> str:
         """Tokenizes a string line using sentencepiece tokenizer according to `FLORES-200`_ dataset.
 
         Args:
@@ -404,7 +405,7 @@ class _SacreBLEUTokenizer:
         return line
 
     @classmethod
-    def _check_tokenizers_validity(cls: Type["_SacreBLEUTokenizer"], tokenize: _TokenizersLiteral) -> None:
+    def _check_tokenizers_validity(cls: type["_SacreBLEUTokenizer"], tokenize: _TokenizersLiteral) -> None:
         """Check if a supported tokenizer is chosen.
 
         Also check all dependencies of a given tokenizers are installed.
@@ -467,6 +468,28 @@ def sacre_bleu_score(
     """Calculate `BLEU score`_ [1] of machine translated text with one or more references.
 
     This implementation follows the behaviour of SacreBLEU [2] implementation from https://github.com/mjpost/sacrebleu.
+
+    .. note::
+        In the original SacreBLEU, references are passed as a list of reference sets (grouped by reference index).
+        In TorchMetrics, references are passed grouped per prediction (each prediction has its own list of references).
+
+        For example::
+
+            # Predictions
+            preds = ['The dog bit the man.', "It wasn't surprising.", 'The man had just bitten him.']
+
+            # Original SacreBLEU:
+            refs = [
+                ['The dog bit the man.', 'It was not unexpected.', 'The man bit him first.'], # First set
+                ['The dog had bit the man.', 'No one was surprised.', 'The man had bitten the dog.'], # Second set
+            ]
+
+            # TorchMetrics SacreBLEU:
+            target = [
+                ['The dog bit the man.', 'The dog had bit the man.'], # References for first prediction
+                ['It was not unexpected.', 'No one was surprised.'], # References for second prediction
+                ['The man bit him first.', 'The man had bitten the dog.'], # References for third prediction
+            ]
 
     Args:
         preds: An iterable of machine translated corpus

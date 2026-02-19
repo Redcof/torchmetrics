@@ -13,8 +13,10 @@
 # limitations under the License.
 from torchmetrics.regression.concordance import ConcordanceCorrCoef
 from torchmetrics.regression.cosine_similarity import CosineSimilarity
+from torchmetrics.regression.crps import ContinuousRankedProbabilityScore
 from torchmetrics.regression.csi import CriticalSuccessIndex
 from torchmetrics.regression.explained_variance import ExplainedVariance
+from torchmetrics.regression.js_divergence import JensenShannonDivergence
 from torchmetrics.regression.kendall import KendallRankCorrCoef
 from torchmetrics.regression.kl_divergence import KLDivergence
 from torchmetrics.regression.log_cosh import LogCoshError
@@ -23,6 +25,7 @@ from torchmetrics.regression.mae import MeanAbsoluteError
 from torchmetrics.regression.mape import MeanAbsolutePercentageError
 from torchmetrics.regression.minkowski import MinkowskiDistance
 from torchmetrics.regression.mse import MeanSquaredError
+from torchmetrics.regression.nrmse import NormalizedRootMeanSquaredError
 from torchmetrics.regression.pearson import PearsonCorrCoef
 from torchmetrics.regression.r2 import R2Score
 from torchmetrics.regression.rse import RelativeSquaredError
@@ -33,17 +36,20 @@ from torchmetrics.regression.wmape import WeightedMeanAbsolutePercentageError
 
 __all__ = [
     "ConcordanceCorrCoef",
+    "ContinuousRankedProbabilityScore",
     "CosineSimilarity",
     "CriticalSuccessIndex",
     "ExplainedVariance",
-    "KendallRankCorrCoef",
+    "JensenShannonDivergence",
     "KLDivergence",
+    "KendallRankCorrCoef",
     "LogCoshError",
-    "MeanSquaredLogError",
     "MeanAbsoluteError",
     "MeanAbsolutePercentageError",
-    "MinkowskiDistance",
     "MeanSquaredError",
+    "MeanSquaredLogError",
+    "MinkowskiDistance",
+    "NormalizedRootMeanSquaredError",
     "PearsonCorrCoef",
     "R2Score",
     "RelativeSquaredError",

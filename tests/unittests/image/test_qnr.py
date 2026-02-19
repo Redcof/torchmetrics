@@ -13,14 +13,14 @@
 # limitations under the License.
 
 from functools import partial
-from typing import Dict, List, NamedTuple
+from typing import NamedTuple
 
 import pytest
 import torch
 from torch import Tensor
+
 from torchmetrics.functional.image.qnr import quality_with_no_reference
 from torchmetrics.image.qnr import QualityWithNoReference
-
 from unittests import BATCH_SIZE, NUM_BATCHES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -32,7 +32,7 @@ seed_all(42)
 
 class _Input(NamedTuple):
     preds: Tensor
-    target: List[Dict[str, Tensor]]
+    target: list[dict[str, Tensor]]
     ms: Tensor
     pan: Tensor
     pan_lr: Tensor
@@ -103,7 +103,7 @@ def _invoke_quality_with_no_reference(preds, target, ms, pan, pan_lr, alpha, bet
 
 
 @pytest.mark.parametrize(
-    "preds, target, ms, pan, pan_lr, alpha, beta, norm_order, window_size",
+    ("preds", "target", "ms", "pan", "pan_lr", "alpha", "beta", "norm_order", "window_size"),
     [(i.preds, i.target, i.ms, i.pan, i.pan_lr, i.alpha, i.beta, i.norm_order, i.window_size) for i in _inputs],
 )
 class TestQualityWithNoReference(MetricTester):

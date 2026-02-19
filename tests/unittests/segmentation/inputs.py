@@ -13,16 +13,43 @@
 # limitations under the License.
 __all__ = ["_Input"]
 
-from typing import NamedTuple
+import torch
 
-from torch import Tensor
-
+from unittests import BATCH_SIZE, NUM_BATCHES, NUM_CLASSES, _Input
 from unittests._helpers import seed_all
 
 seed_all(42)
 
+to_one_hot = lambda x: torch.nn.functional.one_hot(x, NUM_CLASSES).permute(0, 1, 4, 2, 3)
 
-# extrinsic input for clustering metrics that requires predicted clustering labels and target clustering labels
-class _Input(NamedTuple):
-    preds: Tensor
-    target: Tensor
+_one_hot_input_1 = _Input(
+    preds=to_one_hot(torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 16, 16))),
+    target=to_one_hot(torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 16, 16))),
+)
+_one_hot_input_2 = _Input(
+    preds=to_one_hot(torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32))),
+    target=to_one_hot(torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32))),
+)
+_index_input_1 = _Input(
+    preds=torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32)),
+    target=torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32)),
+)
+_index_input_2 = _Input(
+    preds=torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32)),
+    target=torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32)),
+)
+
+_mixed_input_1 = _Input(
+    preds=to_one_hot(torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32))),
+    target=torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32)),
+)
+
+_mixed_input_2 = _Input(
+    preds=torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32)),
+    target=to_one_hot(torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32))),
+)
+
+_mixed_logits_input = _Input(
+    preds=(torch.rand((NUM_BATCHES, BATCH_SIZE, NUM_CLASSES, 32, 32)) * 12 - 6),
+    target=torch.randint(0, NUM_CLASSES, (NUM_BATCHES, BATCH_SIZE, 32, 32)),
+)

@@ -17,9 +17,9 @@ from functools import partial
 import pytest
 import torch
 from sklearn.metrics import jaccard_score
+
 from torchmetrics.functional.regression.csi import critical_success_index
 from torchmetrics.regression.csi import CriticalSuccessIndex
-
 from unittests import BATCH_SIZE, NUM_BATCHES, _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -40,7 +40,7 @@ def _reference_sklearn_jaccard(preds: torch.Tensor, target: torch.Tensor, thresh
 
 
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [
         (_inputs_1.preds, _inputs_1.target),
         (_inputs_2.preds, _inputs_2.target),

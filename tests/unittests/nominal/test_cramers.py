@@ -16,9 +16,9 @@ from functools import partial
 
 import pytest
 import torch
+
 from torchmetrics.functional.nominal.cramers import cramers_v, cramers_v_matrix
 from torchmetrics.nominal.cramers import CramersV
-
 from unittests import BATCH_SIZE, NUM_BATCHES, _Input
 from unittests._helpers.testers import MetricTester
 
@@ -43,7 +43,7 @@ _input_logits = _Input(
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def cramers_matrix_input():
     """Define input in matrix format for the metric."""
     matrix = torch.cat(
@@ -90,7 +90,7 @@ def _dython_cramers_v_matrix(matrix, bias_correction, nan_strategy, nan_replace_
 
 
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [
         (_input_default.preds, _input_default.target),
         (_input_with_nans.preds, _input_with_nans.target),
@@ -98,7 +98,7 @@ def _dython_cramers_v_matrix(matrix, bias_correction, nan_strategy, nan_replace_
     ],
 )
 @pytest.mark.parametrize("bias_correction", [False, True])
-@pytest.mark.parametrize("nan_strategy, nan_replace_value", [("replace", 0.0), ("drop", None)])
+@pytest.mark.parametrize(("nan_strategy", "nan_replace_value"), [("replace", 0.0), ("drop", None)])
 class TestCramersV(MetricTester):
     """Test class for `CramersV` metric."""
 

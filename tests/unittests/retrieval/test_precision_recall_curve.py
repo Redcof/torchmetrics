@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from functools import partial
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Union
 
 import numpy as np
 import pytest
 import torch
 from numpy import array
 from torch import Tensor, tensor
-from torchmetrics.retrieval import RetrievalPrecisionRecallCurve
-from torchmetrics.retrieval.base import _retrieval_aggregate
 from typing_extensions import Literal
 
+from torchmetrics.retrieval import RetrievalPrecisionRecallCurve
+from torchmetrics.retrieval.base import _retrieval_aggregate
 from unittests._helpers import seed_all
 from unittests._helpers.testers import Metric, MetricTester
 from unittests.retrieval.helpers import _custom_aggregate_fn, _default_metric_class_input_arguments, get_group_indexes
@@ -42,7 +42,7 @@ def _compute_precision_recall_curve(
     empty_target_action: str = "skip",
     reverse: bool = False,
     aggregation: Union[Literal["mean", "median", "min", "max"], Callable] = "mean",
-) -> Tuple[Tensor, Tensor, Tensor]:
+) -> tuple[Tensor, Tensor, Tensor]:
     """Compute metric with multiple iterations over every query predictions set.
 
     Didn't find a reliable implementation of precision-recall curve in Information Retrieval,

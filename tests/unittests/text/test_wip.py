@@ -11,17 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Union
+from typing import Union
 
 import pytest
+
 from torchmetrics.functional.text.wip import word_information_preserved
 from torchmetrics.text.wip import WordInfoPreserved
-
 from unittests.text._helpers import TextTester
 from unittests.text._inputs import _inputs_error_rate_batch_size_1, _inputs_error_rate_batch_size_2
 
 
-def _reference_jiwer_wip(preds: Union[str, List[str]], target: Union[str, List[str]]):
+def _reference_jiwer_wip(preds: Union[str, list[str]], target: Union[str, list[str]]):
     try:
         from jiwer import wip
     except ImportError:
@@ -31,7 +31,7 @@ def _reference_jiwer_wip(preds: Union[str, List[str]], target: Union[str, List[s
 
 
 @pytest.mark.parametrize(
-    ["preds", "targets"],
+    ("preds", "targets"),
     [
         (_inputs_error_rate_batch_size_1.preds, _inputs_error_rate_batch_size_1.target),
         (_inputs_error_rate_batch_size_2.preds, _inputs_error_rate_batch_size_2.target),

@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 import torch
+
 from torchmetrics import ClasswiseWrapper, Metric, MetricCollection
 from torchmetrics.classification import (
     BinaryAccuracy,
@@ -32,9 +33,9 @@ from torchmetrics.classification import (
     MultilabelAUROC,
     MultilabelAveragePrecision,
 )
+from torchmetrics.regression import PearsonCorrCoef
+from torchmetrics.text import BLEUScore
 from torchmetrics.utilities.checks import _allclose_recursive
-from torchmetrics.utilities.imports import _TORCH_GREATER_EQUAL_2_0
-
 from unittests._helpers import seed_all
 from unittests._helpers.testers import DummyMetricDiff, DummyMetricMultiOutputDict, DummyMetricSum
 
@@ -160,7 +161,6 @@ def test_metric_collection_args_kwargs(tmpdir):
     assert metric_collection["DummyMetricDiff"].x == -20
 
 
-@pytest.mark.skipif(not _TORCH_GREATER_EQUAL_2_0, reason="Test requires torch 2.0 or higher")
 @pytest.mark.parametrize(
     ("prefix", "postfix"),
     [
@@ -268,12 +268,25 @@ def test_collection_add_metrics():
     collection = MetricCollection([m1])
     collection.add_metrics({"m1_": DummyMetricSum()})
     collection.add_metrics(m2)
+    collection1 = MetricCollection([DummyMetricSum()])
+    collection2 = MetricCollection({"diff_metric": DummyMetricDiff(), "custom_sum": DummyMetricSum()})
+    collection1.add_metrics(collection2)
 
     collection.update(5)
     results = collection.compute()
     assert results["DummyMetricSum"] == results["m1_"]
     assert results["m1_"] == 5
     assert results["DummyMetricDiff"] == -5
+
+    collection1.update(5)
+    results = collection1.compute()
+    assert results["DummyMetricSum"] == 5
+    assert results["diff_metric"] == -5
+    assert results["custom_sum"] == 5
+
+    duplicate_collection = MetricCollection([DummyMetricSum()])
+    with pytest.raises(ValueError, match="Metric with name 'DummyMetricSum' already exists in the collection."):
+        collection1.add_metrics(duplicate_collection)
 
 
 def test_collection_check_arg():
@@ -326,33 +339,38 @@ _ml_target = torch.randint(2, (10, 3))
 
 
 @pytest.mark.parametrize(
-    "metrics, expected, preds, target",
+    ("metrics", "expected", "preds", "target"),
     [
         # single metric forms its own compute group
-        (MulticlassAccuracy(num_classes=3), {0: ["MulticlassAccuracy"]}, _mc_preds, _mc_target),
+        pytest.param(
+            MulticlassAccuracy(num_classes=3), {0: ["MulticlassAccuracy"]}, _mc_preds, _mc_target, id="single_metric"
+        ),
         # two metrics of same class forms a compute group
-        (
+        pytest.param(
             {"acc0": MulticlassAccuracy(num_classes=3), "acc1": MulticlassAccuracy(num_classes=3)},
             {0: ["acc0", "acc1"]},
             _mc_preds,
             _mc_target,
+            id="two_metrics_of_same_class",
         ),
         # two metrics from registry forms a compute group
-        (
+        pytest.param(
             [MulticlassPrecision(num_classes=3), MulticlassRecall(num_classes=3)],
             {0: ["MulticlassPrecision", "MulticlassRecall"]},
             _mc_preds,
             _mc_target,
+            id="two_metrics_from_registry",
         ),
         # two metrics from different classes gives two compute groups
-        (
+        pytest.param(
             [MulticlassConfusionMatrix(num_classes=3), MulticlassRecall(num_classes=3)],
             {0: ["MulticlassConfusionMatrix"], 1: ["MulticlassRecall"]},
             _mc_preds,
             _mc_target,
+            id="two_metrics_from_different_classes",
         ),
         # multi group multi metric
-        (
+        pytest.param(
             [
                 MulticlassConfusionMatrix(num_classes=3),
                 MulticlassCohenKappa(num_classes=3),
@@ -362,9 +380,10 @@ _ml_target = torch.randint(2, (10, 3))
             {0: ["MulticlassConfusionMatrix", "MulticlassCohenKappa"], 1: ["MulticlassRecall", "MulticlassPrecision"]},
             _mc_preds,
             _mc_target,
+            id="multi_group_multi_metric",
         ),
         # Complex example
-        (
+        pytest.param(
             {
                 "acc": MulticlassAccuracy(num_classes=3),
                 "acc2": MulticlassAccuracy(num_classes=3),
@@ -376,9 +395,10 @@ _ml_target = torch.randint(2, (10, 3))
             {0: ["acc", "acc2", "f1", "recall"], 1: ["acc3"], 2: ["confmat"]},
             _mc_preds,
             _mc_target,
+            id="complex_example",
         ),
         # With list states
-        (
+        pytest.param(
             [
                 MulticlassAUROC(num_classes=3, average="macro"),
                 MulticlassAveragePrecision(num_classes=3, average="macro"),
@@ -386,9 +406,10 @@ _ml_target = torch.randint(2, (10, 3))
             {0: ["MulticlassAUROC", "MulticlassAveragePrecision"]},
             _mc_preds,
             _mc_target,
+            id="with_list_states",
         ),
         # Nested collections
-        (
+        pytest.param(
             [
                 MetricCollection(
                     MultilabelAUROC(num_labels=3, average="micro"),
@@ -411,6 +432,7 @@ _ml_target = torch.randint(2, (10, 3))
             },
             _ml_preds,
             _ml_target,
+            id="nested_collections",
         ),
     ],
 )
@@ -567,6 +589,28 @@ def test_compute_group_define_by_user():
     # Check that we are not going to check the groups in the first update
     assert m._groups_checked
     assert m.compute_groups == {0: ["MulticlassConfusionMatrix"], 1: ["MulticlassRecall", "MulticlassPrecision"]}
+
+    preds = torch.randn(10, 3).softmax(dim=-1)
+    target = torch.randint(3, (10,))
+    m.update(preds, target)
+    assert m.compute()
+
+
+def test_compute_group_define_by_user_outside_specs():
+    """Check that user can provide compute groups with missing metrics in the specs."""
+    m = MetricCollection(
+        MulticlassConfusionMatrix(3),
+        MulticlassRecall(3),
+        MulticlassPrecision(3),
+        MulticlassAccuracy(3),
+        compute_groups=[["MulticlassRecall", "MulticlassPrecision"]],
+    )
+    assert m._groups_checked
+    assert m.compute_groups == {
+        0: ["MulticlassRecall", "MulticlassPrecision"],
+        1: ["MulticlassConfusionMatrix"],
+        2: ["MulticlassAccuracy"],
+    }
 
     preds = torch.randn(10, 3).softmax(dim=-1)
     target = torch.randint(3, (10,))
@@ -745,3 +789,69 @@ def test_with_custom_prefix_postfix():
     # Print the calculated metrics
     assert "my_prefix/accuracy/my_postfix" in res
     assert "my_prefix/precision/my_postfix" in res
+
+
+def test_collection_update():
+    """Test that metric collection updates metrics.
+
+    See issue: https://github.com/Lightning-AI/torchmetrics/issues/2916
+
+    """
+    metrics = MetricCollection({
+        "bleu-1": BLEUScore(1),
+        "bleu-2": BLEUScore(2),
+        "bleu-3": BLEUScore(3),
+        "bleu-4": BLEUScore(4),
+    })
+
+    preds = ["the cat is on the mat"]
+    target = [["there is a cat on the mat", "a cat is on the mat"]]
+
+    metrics.update(preds, target)
+    actual = metrics.compute()
+
+    expected = {
+        "bleu-1": torch.tensor(0.8333),
+        "bleu-2": torch.tensor(0.8165),
+        "bleu-3": torch.tensor(0.7937),
+        "bleu-4": torch.tensor(0.7598),
+    }
+
+    for k, v in expected.items():
+        torch.testing.assert_close(actual=actual.get(k), expected=v, rtol=1e-4, atol=1e-4)
+
+
+def test_collection_state_being_re_established_after_copy():
+    """Check that shared metrics states when using compute groups are re-established after a copy.
+
+    See issue: https://github.com/Lightning-AI/torchmetrics/issues/2896
+
+    """
+    m1, m2 = PearsonCorrCoef(), PearsonCorrCoef()
+    m12 = MetricCollection({"m1": m1, "m2": m2}, compute_groups=True)
+    x1, y1 = torch.randn(100), torch.randn(100)
+    m12.update(x1, y1)
+    assert m12.compute_groups == {0: ["m1", "m2"]}
+
+    # Check that the states are pointing to the same location
+    assert not m12._state_is_copy
+    assert m12.m1.mean_x.data_ptr() == m12.m2.mean_x.data_ptr(), "States should point to the same location"
+
+    # Break the references between the states
+    _ = m12.items()
+    assert m12._state_is_copy
+    assert m12.m1.mean_x.data_ptr() != m12.m2.mean_x.data_ptr(), "States should not point to the same location"
+
+    # Update should restore the references between the states
+    x2, y2 = torch.randn(100), torch.randn(100)
+
+    m12.update(x2, y2)
+    assert not m12._state_is_copy
+    assert m12.m1.mean_x.data_ptr() == m12.m2.mean_x.data_ptr(), "States should point to the same location"
+
+    x3, y3 = torch.randn(100), torch.randn(100)
+    m12.update(x3, y3)
+
+    assert not m12._state_is_copy
+    assert m12.m1.mean_x.data_ptr() == m12.m2.mean_x.data_ptr(), "States should point to the same location"
+    assert m12._equal_metric_states(m12.m1, m12.m2)

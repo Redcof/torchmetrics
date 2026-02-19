@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from functools import partial
-from typing import Dict, List, NamedTuple
+from typing import NamedTuple
 
 import numpy as np
 import pytest
@@ -21,10 +21,10 @@ import torch
 from scipy.ndimage import uniform_filter
 from skimage.transform import resize
 from torch import Tensor
+
 from torchmetrics.functional.image.d_s import spatial_distortion_index
 from torchmetrics.functional.image.uqi import universal_image_quality_index
 from torchmetrics.image.d_s import SpatialDistortionIndex
-
 from unittests import BATCH_SIZE, NUM_BATCHES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -34,7 +34,7 @@ seed_all(42)
 
 class _Input(NamedTuple):
     preds: Tensor
-    target: List[Dict[str, Tensor]]
+    target: list[dict[str, Tensor]]
     ms: Tensor
     pan: Tensor
     pan_lr: Tensor
@@ -143,7 +143,7 @@ def _invoke_spatial_distortion_index(preds, target, ms, pan, pan_lr, norm_order,
 
 
 @pytest.mark.parametrize(
-    "preds, target, ms, pan, pan_lr, norm_order, window_size",
+    ("preds", "target", "ms", "pan", "pan_lr", "norm_order", "window_size"),
     [(i.preds, i.target, i.ms, i.pan, i.pan_lr, i.norm_order, i.window_size) for i in _inputs],
 )
 class TestSpatialDistortionIndex(MetricTester):

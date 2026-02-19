@@ -1,21 +1,22 @@
 .. customcarditem::
-   :header: Dice
+   :header: Score
    :image: https://pl-flash-data.s3.amazonaws.com/assets/thumbnails/tabular_classification.svg
-   :tags: Classification
+   :tags: Segmentation
 
 .. include:: ../links.rst
 
-####
-Dice
-####
+##########
+Dice Score
+##########
 
 Module Interface
 ________________
 
-.. autoclass:: torchmetrics.Dice
-    :exclude-members: update, compute
+.. autoclass:: torchmetrics.segmentation.DiceScore
+    :noindex:
 
 Functional Interface
 ____________________
 
-.. autofunction:: torchmetrics.functional.dice
+.. autofunction:: torchmetrics.functional.segmentation.dice_score
+    :noindex:

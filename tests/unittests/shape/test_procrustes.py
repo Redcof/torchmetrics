@@ -17,9 +17,9 @@ import numpy as np
 import pytest
 import torch
 from scipy.spatial import procrustes as scipy_procrustes
+
 from torchmetrics.functional.shape.procrustes import procrustes_disparity
 from torchmetrics.shape.procrustes import ProcrustesDisparity
-
 from unittests import BATCH_SIZE, EXTRA_DIM, NUM_BATCHES, _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -50,7 +50,7 @@ def _reference_procrustes(point_cloud1, point_cloud2, reduction=None):
     return disparity
 
 
-@pytest.mark.parametrize("point_cloud1, point_cloud2", [(_inputs.preds, _inputs.target)])
+@pytest.mark.parametrize(("point_cloud1", "point_cloud2"), [(_inputs.preds, _inputs.target)])
 class TestProcrustesDisparity(MetricTester):
     """Test class for `ProcrustesDisparity` metric."""
 

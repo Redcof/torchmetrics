@@ -19,10 +19,10 @@ import pytest
 import torch
 from lightning_utilities.core.imports import compare_version
 from scipy.stats import kendalltau
+
 from torchmetrics.functional.regression.kendall import kendall_rank_corrcoef
 from torchmetrics.regression.kendall import KendallRankCorrCoef
-from torchmetrics.utilities.imports import _SCIPY_GREATER_EQUAL_1_8, _TORCH_LOWER_2_0
-
+from torchmetrics.utilities.imports import _SCIPY_GREATER_EQUAL_1_8
 from unittests import BATCH_SIZE, EXTRA_DIM, NUM_BATCHES, _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -70,7 +70,7 @@ def _reference_scipy_kendall(preds, target, alternative, variant):
 
 
 @pytest.mark.parametrize(
-    "preds, target, alternative",
+    ("preds", "target", "alternative"),
     [
         (_single_inputs1.preds, _single_inputs1.target, None),
         (_single_inputs2.preds, _single_inputs2.target, "less"),
@@ -84,11 +84,7 @@ def _reference_scipy_kendall(preds, target, alternative, variant):
 class TestKendallRankCorrCoef(MetricTester):
     """Test class for `KendallRankCorrCoef` metric."""
 
-    # TODO
-    @pytest.mark.skipif(
-        sys.platform == "darwin" and not _TORCH_LOWER_2_0,
-        reason="Tests are not working on mac for newer version of PyTorch.",
-    )
+    @pytest.mark.skipif(sys.platform == "darwin", reason="Fails on MacOS")  # TODO: investigate
     @pytest.mark.parametrize("ddp", [pytest.param(True, marks=pytest.mark.DDP), False])
     def test_kendall_rank_corrcoef(self, preds, target, alternative, variant, ddp):
         """Test class implementation of metric."""

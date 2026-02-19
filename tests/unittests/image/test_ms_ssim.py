@@ -12,15 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import partial
+
 import pytest
 import torch
 from pytorch_msssim import ms_ssim
+
 from torchmetrics.functional.image.ssim import multiscale_structural_similarity_index_measure
 from torchmetrics.image.ssim import MultiScaleStructuralSimilarityIndexMeasure
-
-from unittests import NUM_BATCHES, _Input
-from unittests._helpers import seed_all
+from unittests import NUM_BATCHES, NUM_PROCESSES, USE_PYTEST_POOL, _Input
+from unittests._helpers import _IS_WINDOWS, seed_all
 from unittests._helpers.testers import MetricTester
+from unittests.conftest import setup_ddp
 
 seed_all(42)
 
@@ -43,7 +46,7 @@ def _reference_ms_ssim(preds, target, data_range: float = 1.0, kernel_size: int 
 
 
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [(i.preds, i.target) for i in _inputs],
 )
 class TestMultiScaleStructuralSimilarityIndexMeasure(MetricTester):
@@ -104,3 +107,30 @@ def test_ms_ssim_contrast_sensitivity():
         preds, target, data_range=1.0, kernel_size=3, betas=(1.0, 0.5, 0.25)
     )
     assert isinstance(out, torch.Tensor)
+
+
+def _run_ms_ssim_ddp(rank: int, world_size: int):
+    """Run MSSSIM metric computation in a DDP setup."""
+    setup_ddp(rank, world_size)
+    device = torch.device(f"cuda:{rank}")
+    metric = MultiScaleStructuralSimilarityIndexMeasure(reduction="none").to(device)
+
+    for _ in range(3):
+        x, y = torch.rand(4, 3, 224, 224).to(device).chunk(2)
+        metric.update(x, y)
+
+    result = metric.compute()
+    assert isinstance(result, torch.Tensor), "Expected compute result to be a tensor"
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="test requires cuda")
+@pytest.mark.skipif(_IS_WINDOWS, reason="DDP not supported on Windows")
+@pytest.mark.skipif(not USE_PYTEST_POOL, reason="DDP pool is not available")
+@pytest.mark.DDP
+def test_ms_ssim_reduction_none_ddp():
+    """Fail when reduction='none' and dist_reduce_fx='cat' used with DDP.
+
+    See issue: https://github.com/Lightning-AI/torchmetrics/issues/3159
+
+    """
+    pytest.pool.map(partial(_run_ms_ssim_ddp, world_size=NUM_PROCESSES), range(NUM_PROCESSES))

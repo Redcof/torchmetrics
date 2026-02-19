@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any, List, Optional, Union, cast
 
 import torch
 from torch import Tensor
@@ -22,7 +23,6 @@ from torchmetrics.metric import Metric
 from torchmetrics.utilities.data import dim_zero_cat
 from torchmetrics.utilities.imports import _MATPLOTLIB_AVAILABLE
 from torchmetrics.utilities.plot import _AX_TYPE, _PLOT_OUT_TYPE
-from torchmetrics.utilities.prints import rank_zero_warn
 
 if not _MATPLOTLIB_AVAILABLE:
     __doctest_skip__ = ["KLDivergence.plot"]
@@ -46,14 +46,6 @@ class KLDivergence(Metric):
     As output of ``forward`` and ``compute`` the metric returns the following output:
 
     - ``kl_divergence`` (:class:`~torch.Tensor`): A tensor with the KL divergence
-
-    .. warning::
-        The input order and naming in metric ``KLDivergence`` is set to be deprecated in v1.4 and changed in v1.5.
-        Input argument ``p`` will be renamed to ``target`` and will be moved to be the second argument of the metric.
-        Input argument ``q`` will be renamed to ``preds`` and will be moved to the first argument of the metric.
-        Thus, ``KLDivergence(p, q)`` will equal ``KLDivergence(target=q, preds=p)`` in the future to be consistent
-        with the rest of ``torchmetrics``. From v1.4 the two new arguments will be added as keyword arguments and
-        from v1.5 the two old arguments will be removed.
 
     Args:
         log_prob: bool indicating if input is log-probabilities or probabilities. If given as probabilities,
@@ -92,6 +84,7 @@ class KLDivergence(Metric):
     full_state_update: bool = False
     plot_lower_bound: float = 0.0
 
+    measures: Union[Tensor, List[Tensor]]
     total: Tensor
     # FIXME: Apply once minimal torch is 1.10. For torch<=1.9, jit does not support Union types
     # measures: Union[Tensor, List[Tensor]]
@@ -102,15 +95,6 @@ class KLDivergence(Metric):
         reduction: Literal["mean", "sum", "none", None] = "mean",
         **kwargs: Any,
     ) -> None:
-        rank_zero_warn(
-            "The input order and naming in metric `KLDivergence` is set to be deprecated in v1.4 and changed in v1.5."
-            "Input argument `p` will be renamed to `target` and will be moved to be the second argument of the metric."
-            "Input argument `q` will be renamed to `preds` and will be moved to the first argument of the metric."
-            "Thus, `KLDivergence(p, q)` will equal `KLDivergence(target=q, preds=p)` in the future to be consistent"
-            " with the rest of torchmetrics. From v1.4 the two new arguments will be added as keyword arguments and"
-            " from v1.5 the two old arguments will be removed.",
-            DeprecationWarning,
-        )
         super().__init__(**kwargs)
         if not isinstance(log_prob, bool):
             raise TypeError(f"Expected argument `log_prob` to be bool but got {log_prob}")
@@ -131,14 +115,18 @@ class KLDivergence(Metric):
         """Update metric states with predictions and targets."""
         measures, total = _kld_update(p, q, self.log_prob)
         if self.reduction is None or self.reduction == "none":
-            self.measures.append(measures)
+            cast(List[Tensor], self.measures).append(measures)
         else:
-            self.measures += measures.sum()
+            self.measures = cast(Tensor, self.measures) + measures.sum()
             self.total += total
 
     def compute(self) -> Tensor:
         """Compute metric."""
-        measures: Tensor = dim_zero_cat(self.measures) if self.reduction in ["none", None] else self.measures
+        measures: Tensor = (
+            dim_zero_cat(cast(List[Tensor], self.measures))
+            if self.reduction in ["none", None]
+            else cast(Tensor, self.measures)
+        )
         return _kld_compute(measures, self.total, self.reduction)
 
     def plot(

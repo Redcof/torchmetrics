@@ -16,9 +16,9 @@ from functools import partial
 import pytest
 import torch
 from sklearn.metrics import explained_variance_score
+
 from torchmetrics.functional import explained_variance
 from torchmetrics.regression import ExplainedVariance
-
 from unittests import BATCH_SIZE, NUM_BATCHES, _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -53,7 +53,7 @@ def _multi_target_ref_metric(preds, target, sk_fn=explained_variance_score):
 
 @pytest.mark.parametrize("multioutput", ["raw_values", "uniform_average", "variance_weighted"])
 @pytest.mark.parametrize(
-    "preds, target, ref_metric",
+    ("preds", "target", "ref_metric"),
     [
         (_single_target_inputs.preds, _single_target_inputs.target, _single_target_ref_metric),
         (_multi_target_inputs.preds, _multi_target_inputs.target, _multi_target_ref_metric),

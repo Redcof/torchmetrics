@@ -10,7 +10,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, List, Literal, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any, Literal, Optional, Union
 
 import torch
 from torch import Tensor
@@ -60,8 +61,9 @@ class HausdorffDistance(Metric):
           `"chessboard"` or `"taxicab"`
         spacing: spacing between pixels along each spatial dimension. If not provided the spacing is assumed to be 1
         directed: whether to calculate directed or undirected Hausdorff distance
-        input_format: What kind of input the function receives. Choose between ``"one-hot"`` for one-hot encoded tensors
-          or ``"index"`` for index tensors
+        input_format: What kind of input the function receives.
+            Choose between ``"one-hot"`` for one-hot encoded tensors, ``"index"`` for index tensors
+            or ``"mixed"`` for one one-hot encoded and one index tensor
         kwargs: Additional keyword arguments, see :ref:`Metric kwargs` for more info.
 
     Example:
@@ -88,9 +90,9 @@ class HausdorffDistance(Metric):
         num_classes: int,
         include_background: bool = False,
         distance_metric: Literal["euclidean", "chessboard", "taxicab"] = "euclidean",
-        spacing: Optional[Union[Tensor, List[float]]] = None,
+        spacing: Optional[Union[Tensor, list[float]]] = None,
         directed: bool = False,
-        input_format: Literal["one-hot", "index"] = "one-hot",
+        input_format: Literal["one-hot", "index", "mixed"] = "one-hot",
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)

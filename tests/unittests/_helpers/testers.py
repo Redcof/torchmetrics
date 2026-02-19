@@ -12,45 +12,103 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import pickle
-import sys
+from collections.abc import Sequence
 from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Optional, Union
 
 import numpy as np
 import pytest
 import torch
 from lightning_utilities import apply_to_collection
 from torch import Tensor, tensor
+
 from torchmetrics import Metric
 from torchmetrics.utilities.data import _flatten
-
 from unittests import NUM_PROCESSES, _reference_cachier
+from unittests._helpers import _IS_WINDOWS
 
 
-def _assert_allclose(tm_result: Any, ref_result: Any, atol: float = 1e-8, key: Optional[str] = None) -> None:
+def _sort_if_needed(arr: np.ndarray) -> np.ndarray:
+    """Sort a numpy array for comparison.
+
+    - If 1D, returns a sorted copy of the array.
+    - If 2D or higher, sorts the rows lexicographically (dictionary order).
+    - Otherwise, returns the array unchanged.
+
+    Args:
+        arr (np.ndarray): The input numpy array.
+
+    Returns:
+        np.ndarray: The sorted array (or unchanged if not 1D or 2D+).
+
+    Examples:
+        >>> import numpy as np
+        >>> arr = np.array([
+        ...     [2, 1, 3],
+        ...     [1, 2, 3],
+        ...     [1, 1, 2]
+        ... ])
+        >>> _sort_if_needed(arr)
+        array([[1, 1, 2],
+               [1, 2, 3],
+               [2, 1, 3]])
+
+    """
+    if arr.ndim == 1:
+        return np.sort(arr)
+    if arr.ndim > 1:
+        return arr[np.lexsort(arr.T[::-1])]
+    return arr
+
+
+def _assert_allclose(
+    tm_result: Any, ref_result: Any, atol: float = 1e-8, key: Optional[str] = None, check_ddp_sorting: bool = False
+) -> None:
     """Recursively assert that two results are within a certain tolerance."""
     # single output compare
     if isinstance(tm_result, Tensor):
+        tm_result_np = tm_result.detach().cpu().numpy()
+        ref_result_np = ref_result.detach().cpu().numpy() if isinstance(ref_result, Tensor) else ref_result
+        if check_ddp_sorting:
+            if tm_result_np.ndim != ref_result_np.ndim:
+                raise ValueError(
+                    f"Dimension mismatch: tm_result_np.ndim={tm_result_np.ndim}, "
+                    f"ref_result_np.ndim={ref_result_np.ndim}"
+                )
+
+            tm_result_np = _sort_if_needed(tm_result_np)
+            ref_result_np = _sort_if_needed(ref_result_np)
         assert np.allclose(
-            tm_result.detach().cpu().numpy() if isinstance(tm_result, Tensor) else tm_result,
-            ref_result.detach().cpu().numpy() if isinstance(ref_result, Tensor) else ref_result,
+            tm_result_np,
+            ref_result_np,
             atol=atol,
             equal_nan=True,
-        )
+        ), f"tm_result: {tm_result_np}, ref_result: {ref_result_np}"
     # multi output compare
     elif isinstance(tm_result, Sequence):
         for pl_res, ref_res in zip(tm_result, ref_result):
-            _assert_allclose(pl_res, ref_res, atol=atol)
-    elif isinstance(tm_result, Dict):
+            _assert_allclose(pl_res, ref_res, atol=atol, check_ddp_sorting=check_ddp_sorting)
+    elif isinstance(tm_result, dict):
         if key is None:
             raise KeyError("Provide Key for Dict based metric results.")
+        tm_result_np = tm_result[key].detach().cpu().numpy() if isinstance(tm_result[key], Tensor) else tm_result[key]
+        ref_result_np = ref_result.detach().cpu().numpy() if isinstance(ref_result, Tensor) else ref_result
+        if check_ddp_sorting:
+            if tm_result_np.ndim != ref_result_np.ndim:
+                raise ValueError(
+                    f"Dimension mismatch: tm_result_np.ndim={tm_result_np.ndim}, "
+                    f"ref_result_np.ndim={ref_result_np.ndim}"
+                )
+
+            tm_result_np = _sort_if_needed(tm_result_np)
+            ref_result_np = _sort_if_needed(ref_result_np)
         assert np.allclose(
-            tm_result[key].detach().cpu().numpy() if isinstance(tm_result[key], Tensor) else tm_result[key],
-            ref_result.detach().cpu().numpy() if isinstance(ref_result, Tensor) else ref_result,
+            tm_result_np,
+            ref_result_np,
             atol=atol,
             equal_nan=True,
-        )
+        ), f"tm_result: {tm_result_np}, ref_result: {ref_result_np}"
     else:
         raise ValueError("Unknown format for comparison")
 
@@ -60,7 +118,7 @@ def _assert_tensor(tm_result: Any, key: Optional[str] = None) -> None:
     if isinstance(tm_result, Sequence):
         for plr in tm_result:
             _assert_tensor(plr)
-    elif isinstance(tm_result, Dict):
+    elif isinstance(tm_result, dict):
         if key is None:
             raise KeyError("Provide Key for Dict based metric results.")
         assert isinstance(tm_result[key], Tensor)
@@ -73,7 +131,7 @@ def _assert_requires_grad(metric: Metric, tm_result: Any, key: Optional[str] = N
     if isinstance(tm_result, Sequence):
         for plr in tm_result:
             _assert_requires_grad(metric, plr, key=key)
-    elif isinstance(tm_result, Dict):
+    elif isinstance(tm_result, dict):
         if key is None:
             raise KeyError("Provide Key for Dict based metric results.")
         assert metric.is_differentiable == tm_result[key].requires_grad
@@ -84,8 +142,8 @@ def _assert_requires_grad(metric: Metric, tm_result: Any, key: Optional[str] = N
 def _class_test(
     rank: int,
     world_size: int,
-    preds: Union[Tensor, list, List[Dict[str, Tensor]]],
-    target: Union[Tensor, list, List[Dict[str, Tensor]]],
+    preds: Union[Tensor, list, list[dict[str, Tensor]]],
+    target: Union[Tensor, list, list[dict[str, Tensor]]],
     metric_class: Metric,
     reference_metric: Callable,
     dist_sync_on_step: bool,
@@ -97,6 +155,8 @@ def _class_test(
     fragment_kwargs: bool = False,
     check_scriptable: bool = True,
     check_state_dict: bool = True,
+    check_picklable: bool = True,
+    check_ddp_sorting: bool = False,
     **kwargs_update: Any,
 ):
     """Comparison between class metric and reference metric.
@@ -120,6 +180,8 @@ def _class_test(
         fragment_kwargs: whether tensors in kwargs should be divided as `preds` and `target` among processes
         check_scriptable: bool indicating if metric should also be tested if it can be scripted
         check_state_dict: bool indicating if metric should be tested that its state_dict by default is empty
+        check_picklable: bool indicating if metric should be tested that it can be pickled
+        check_ddp_sorting: bool indicating if metric output should be sorted before comparison
         kwargs_update: Additional keyword arguments that will be passed with preds and
             target when running update on the metric.
 
@@ -145,7 +207,7 @@ def _class_test(
     # check that metric can be cloned
     clone = metric.clone()
     assert clone is not metric, "Clone is not a different object than the metric"
-    assert type(clone) == type(metric), "Type of clone did not match metric type"
+    assert type(clone) == type(metric), "Type of clone did not match metric type"  # noqa: E721
 
     # move to device
     metric = metric.to(device)
@@ -155,8 +217,9 @@ def _class_test(
     kwargs_update = {k: v.to(device) if isinstance(v, Tensor) else v for k, v in kwargs_update.items()}
 
     # verify metrics work after being loaded from pickled state
-    pickled_metric = pickle.dumps(metric)
-    metric = pickle.loads(pickled_metric)
+    if check_picklable:
+        pickled_metric = pickle.dumps(metric)
+        metric = pickle.loads(pickled_metric)
     metric_clone = deepcopy(metric)
 
     for i in range(rank, num_batches, world_size):
@@ -191,9 +254,15 @@ def _class_test(
             ref_batch_result = _reference_cachier(reference_metric)(ddp_preds, ddp_target, **ddp_kwargs_upd)
             if isinstance(batch_result, dict):
                 for key in batch_result:
-                    _assert_allclose(batch_result, ref_batch_result[key].numpy(), atol=atol, key=key)
+                    _assert_allclose(
+                        batch_result,
+                        ref_batch_result[key].numpy(),
+                        atol=atol,
+                        key=key,
+                        check_ddp_sorting=check_ddp_sorting,
+                    )
             else:
-                _assert_allclose(batch_result, ref_batch_result, atol=atol)
+                _assert_allclose(batch_result, ref_batch_result, atol=atol, check_ddp_sorting=check_ddp_sorting)
 
         elif check_batch and not metric.dist_sync_on_step:
             batch_kwargs_update = {
@@ -205,9 +274,15 @@ def _class_test(
             ref_batch_result = _reference_cachier(reference_metric)(preds_, target_, **batch_kwargs_update)
             if isinstance(batch_result, dict):
                 for key in batch_result:
-                    _assert_allclose(batch_result, ref_batch_result[key].numpy(), atol=atol, key=key)
+                    _assert_allclose(
+                        batch_result,
+                        ref_batch_result[key].numpy(),
+                        atol=atol,
+                        key=key,
+                        check_ddp_sorting=check_ddp_sorting,
+                    )
             else:
-                _assert_allclose(batch_result, ref_batch_result, atol=atol)
+                _assert_allclose(batch_result, ref_batch_result, atol=atol, check_ddp_sorting=check_ddp_sorting)
 
     # check that metrics are hashable
     assert hash(metric), repr(metric)
@@ -244,14 +319,14 @@ def _class_test(
     # assert after aggregation
     if isinstance(ref_result, dict):
         for key in ref_result:
-            _assert_allclose(result, ref_result[key].numpy(), atol=atol, key=key)
+            _assert_allclose(result, ref_result[key].numpy(), atol=atol, key=key, check_ddp_sorting=check_ddp_sorting)
     else:
-        _assert_allclose(result, ref_result, atol=atol)
+        _assert_allclose(result, ref_result, atol=atol, check_ddp_sorting=check_ddp_sorting)
 
 
 def _functional_test(
     preds: Union[Tensor, list],
-    target: Union[Tensor, list, List[Dict[str, Tensor]]],
+    target: Union[Tensor, list, list[dict[str, Tensor]]],
     metric_functional: Callable,
     reference_metric: Callable,
     metric_args: Optional[dict] = None,
@@ -309,14 +384,18 @@ def _functional_test(
             **extra_kwargs,
         )
         # assert it is the same
-        _assert_allclose(tm_result, ref_result, atol=atol)
+        if isinstance(ref_result, dict):
+            for key in ref_result:
+                _assert_allclose(tm_result, ref_result[key].numpy(), atol=atol, key=key)
+        else:
+            _assert_allclose(tm_result, ref_result, atol=atol)
 
 
 def _assert_dtype_support(
     metric_module: Optional[Metric],
     metric_functional: Optional[Callable],
     preds: Tensor,
-    target: Union[Tensor, List[Dict[str, Tensor]]],
+    target: Union[Tensor, list[dict[str, Tensor]]],
     device: str = "cpu",
     dtype: torch.dtype = torch.half,
     **kwargs_update: Any,
@@ -419,8 +498,8 @@ class MetricTester:
     def run_class_metric_test(
         self,
         ddp: bool,
-        preds: Union[Tensor, List[Dict]],
-        target: Union[Tensor, List[Dict]],
+        preds: Union[Tensor, list[dict]],
+        target: Union[Tensor, list[dict]],
         metric_class: Metric,
         reference_metric: Callable,
         dist_sync_on_step: bool = False,
@@ -430,7 +509,9 @@ class MetricTester:
         fragment_kwargs: bool = False,
         check_scriptable: bool = True,
         check_state_dict: bool = True,
+        check_picklable: bool = True,
         atol: Optional[float] = None,
+        check_ddp_sorting: bool = False,
         **kwargs_update: Any,
     ):
         """Core method that should be used for testing class. Call this inside testing methods.
@@ -450,7 +531,9 @@ class MetricTester:
             fragment_kwargs: whether tensors in kwargs should be divided as `preds` and `target` among processes
             check_scriptable: bool indicating if metric should also be tested if it can be scripted
             check_state_dict: bool indicating if metric should be tested that its state_dict by default is empty
+            check_picklable: bool indicating if metric should be tested that it can be pickled
             atol: absolute tolerance used for comparison of results, if None will use self.atol
+            check_ddp_sorting: bool indicating if metric output should be sorted before comparison
             kwargs_update: Additional keyword arguments that will be passed with preds and
                 target when running update on the metric.
 
@@ -469,10 +552,12 @@ class MetricTester:
             "fragment_kwargs": fragment_kwargs,
             "check_scriptable": check_scriptable,
             "check_state_dict": check_state_dict,
+            "check_picklable": check_picklable,
+            "check_ddp_sorting": check_ddp_sorting,
         }
 
         if ddp and hasattr(pytest, "pool"):
-            if sys.platform == "win32":
+            if _IS_WINDOWS:
                 pytest.skip("DDP not supported on windows")
             pytest.pool.starmap(
                 partial(_class_test, **common_kwargs, **kwargs_update),
@@ -684,7 +769,7 @@ def inject_ignore_index(x: Tensor, ignore_index: int) -> Tensor:
     return x
 
 
-def remove_ignore_index(target: Tensor, preds: Tensor, ignore_index: Optional[int]) -> Tuple[Tensor, Tensor]:
+def remove_ignore_index(target: Tensor, preds: Tensor, ignore_index: Optional[int]) -> tuple[Tensor, Tensor]:
     """Remove samples that are equal to the ignore_index in comparison functions.
 
     Example:
@@ -703,7 +788,7 @@ def remove_ignore_index(target: Tensor, preds: Tensor, ignore_index: Optional[in
 
 def remove_ignore_index_groups(
     target: Tensor, preds: Tensor, groups: Tensor, ignore_index: Optional[int]
-) -> Tuple[Tensor, Tensor, Tensor]:
+) -> tuple[Tensor, Tensor, Tensor]:
     """Version of the remove_ignore_index which includes groups."""
     if ignore_index is not None:
         idx = target == ignore_index

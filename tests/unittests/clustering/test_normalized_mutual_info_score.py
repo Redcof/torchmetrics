@@ -16,9 +16,9 @@ from functools import partial
 import pytest
 import torch
 from sklearn.metrics import normalized_mutual_info_score as sklearn_nmi
+
 from torchmetrics.clustering import NormalizedMutualInfoScore
 from torchmetrics.functional.clustering import normalized_mutual_info_score
-
 from unittests import BATCH_SIZE, NUM_CLASSES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -28,7 +28,7 @@ seed_all(42)
 
 
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [
         (_single_target_extrinsic1.preds, _single_target_extrinsic1.target),
         (_single_target_extrinsic2.preds, _single_target_extrinsic2.target),

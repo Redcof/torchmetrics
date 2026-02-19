@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Optional, Sequence, Type, Union
+from collections.abc import Sequence
+from typing import Any, Optional, Union
 
 import torch
 from torch import Tensor
@@ -97,6 +98,7 @@ class MulticlassExactMatch(Metric):
 
     """
 
+    total: Tensor
     is_differentiable: bool = False
     higher_is_better: bool = True
     full_state_update: bool = False
@@ -142,15 +144,30 @@ class MulticlassExactMatch(Metric):
 
         correct, total = _multiclass_exact_match_update(preds, target, self.multidim_average, self.ignore_index)
         if self.multidim_average == "samplewise":
+            if not isinstance(self.correct, list):
+                raise TypeError("Expected `self.correct` to be a list in samplewise mode.")
             self.correct.append(correct)
+
+            if not isinstance(self.total, Tensor):
+                raise TypeError("Expected `self.total` to be a Tensor in samplewise mode.")
             self.total = total
         else:
+            if not isinstance(self.correct, Tensor):
+                raise TypeError("Expected `self.correct` to be a tensor in global mode.")
             self.correct += correct
+
+            if not isinstance(self.total, Tensor):
+                raise TypeError("Expected `self.total` to be a Tensor in samplewise mode.")
             self.total += total
 
     def compute(self) -> Tensor:
         """Compute metric."""
         correct = dim_zero_cat(self.correct) if isinstance(self.correct, list) else self.correct
+
+        # Validate that `correct` and `total` are tensors
+        if not isinstance(correct, Tensor) or not isinstance(self.total, Tensor):
+            raise TypeError("Expected `correct` and `total` to be tensors after processing.")
+
         return _exact_match_reduce(correct, self.total)
 
     def plot(
@@ -262,6 +279,7 @@ class MultilabelExactMatch(Metric):
 
     """
 
+    total: Tensor
     is_differentiable: bool = False
     higher_is_better: bool = True
     full_state_update: bool = False
@@ -309,17 +327,39 @@ class MultilabelExactMatch(Metric):
         preds, target = _multilabel_stat_scores_format(
             preds, target, self.num_labels, self.threshold, self.ignore_index
         )
-        correct, total = _multilabel_exact_match_update(preds, target, self.num_labels, self.multidim_average)
+        correct, total = _multilabel_exact_match_update(
+            preds=preds,
+            target=target,
+            num_labels=self.num_labels,
+            multidim_average=self.multidim_average,
+            ignore_index=self.ignore_index,
+        )
+
         if self.multidim_average == "samplewise":
+            if not isinstance(self.correct, list):
+                raise TypeError("Expected `self.correct` to be a list in samplewise mode.")
             self.correct.append(correct)
+
+            if not isinstance(self.total, Tensor):
+                raise TypeError("Expected `self.total` to be a Tensor in samplewise mode.")
             self.total = total
         else:
+            if not isinstance(self.correct, Tensor):
+                raise TypeError("Expected `self.correct` to be a tensor in global mode.")
             self.correct += correct
+
+            if not isinstance(self.total, Tensor):
+                raise TypeError("Expected `self.total` to be a Tensor in samplewise mode.")
             self.total += total
 
     def compute(self) -> Tensor:
         """Compute metric."""
         correct = dim_zero_cat(self.correct) if isinstance(self.correct, list) else self.correct
+
+        # Validate that `correct` and `total` are tensors
+        if not isinstance(correct, Tensor) or not isinstance(self.total, Tensor):
+            raise TypeError("Expected `correct` and `total` to be tensors after processing.")
+
         return _exact_match_reduce(correct, self.total)
 
     def plot(
@@ -372,7 +412,7 @@ class ExactMatch(_ClassificationTaskWrapper):
     correctly classified.
 
     This module is a simple wrapper to get the task specific versions of this metric, which is done by setting the
-    ``task`` argument to either ``'multiclass'`` or ``multilabel``. See the documentation of
+    ``task`` argument to either ``'multiclass'`` or ``'multilabel'``. See the documentation of
     :class:`~torchmetrics.classification.MulticlassExactMatch` and
     :class:`~torchmetrics.classification.MultilabelExactMatch` for the specific details of each argument influence and
     examples.
@@ -394,7 +434,7 @@ class ExactMatch(_ClassificationTaskWrapper):
     """
 
     def __new__(  # type: ignore[misc]
-        cls: Type["ExactMatch"],
+        cls: type["ExactMatch"],
         task: Literal["binary", "multiclass", "multilabel"],
         threshold: float = 0.5,
         num_classes: Optional[int] = None,

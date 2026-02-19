@@ -13,17 +13,18 @@
 # limitations under the License.
 
 import re
+from collections.abc import Sequence
 from functools import partial
-from typing import Callable, Sequence, Union
+from typing import Callable, Union
 
 import pytest
 import torch
 from torch import Tensor
+from typing_extensions import Literal
+
 from torchmetrics.functional.text.rouge import rouge_score
 from torchmetrics.text.rouge import ROUGEScore
 from torchmetrics.utilities.imports import _NLTK_AVAILABLE, _ROUGE_SCORE_AVAILABLE
-from typing_extensions import Literal
-
 from unittests._helpers import skip_on_connection_issues
 from unittests.text._helpers import TextTester
 from unittests.text._inputs import _Input, _inputs_multiple_references, _inputs_single_sentence_single_reference
@@ -74,10 +75,12 @@ def _reference_rouge_score(
         aggregator_avg = BootstrapAggregator()
 
         if accumulate == "best":
-            key_curr = next(iter(list_results[0].keys()))
-            all_fmeasure = torch.tensor([v[key_curr].fmeasure for v in list_results])
-            highest_idx = torch.argmax(all_fmeasure).item()
-            aggregator.add_scores(list_results[highest_idx])
+            scores = {}
+            for rouge_key in list_results[0]:
+                all_fmeasure = torch.tensor([v[rouge_key].fmeasure for v in list_results])
+                highest_idx = torch.argmax(all_fmeasure).item()
+                scores[rouge_key] = list_results[highest_idx][rouge_key]
+            aggregator.add_scores(scores)
         elif accumulate == "avg":
             for _score in list_results:
                 aggregator_avg.add_scores(_score)
@@ -93,7 +96,7 @@ def _reference_rouge_score(
 
 @pytest.mark.skipif(not _NLTK_AVAILABLE, reason="metric requires nltk")
 @pytest.mark.parametrize(
-    ["pl_rouge_metric_key", "use_stemmer"],
+    ("pl_rouge_metric_key", "use_stemmer"),
     [
         ("rouge1_precision", True),
         ("rouge1_recall", True),
@@ -110,7 +113,7 @@ def _reference_rouge_score(
     ],
 )
 @pytest.mark.parametrize(
-    ["preds", "targets"],
+    ("preds", "targets"),
     [
         (_inputs_multiple_references.preds, _inputs_multiple_references.target),
     ],
@@ -269,3 +272,56 @@ def test_rouge_lsum_score(pl_rouge_metric_key, use_stemmer):
         use_stemmer=use_stemmer,
     )
     assert torch.isclose(metrics_score[rouge_level + "_" + metric], original_score)
+
+
+@pytest.mark.parametrize(
+    ("preds", "references", "expected_scores"),
+    [
+        (
+            "a b c",
+            ["a b c", "c b a"],
+            {
+                "rouge1_fmeasure": 1.0,
+                "rouge1_precision": 1.0,
+                "rouge1_recall": 1.0,
+                "rouge2_fmeasure": 1.0,
+                "rouge2_precision": 1.0,
+                "rouge2_recall": 1.0,
+                "rougeL_fmeasure": 1.0,
+                "rougeL_precision": 1.0,
+                "rougeL_recall": 1.0,
+                "rougeLsum_fmeasure": 1.0,
+                "rougeLsum_precision": 1.0,
+                "rougeLsum_recall": 1.0,
+            },
+        ),
+        (
+            "a b c",
+            ["c b a", "a b c"],
+            {
+                "rouge1_fmeasure": 1.0,
+                "rouge1_precision": 1.0,
+                "rouge1_recall": 1.0,
+                "rouge2_fmeasure": 1.0,
+                "rouge2_precision": 1.0,
+                "rouge2_recall": 1.0,
+                "rougeL_fmeasure": 1.0,
+                "rougeL_precision": 1.0,
+                "rougeL_recall": 1.0,
+                "rougeLsum_fmeasure": 1.0,
+                "rougeLsum_precision": 1.0,
+                "rougeLsum_recall": 1.0,
+            },
+        ),
+    ],
+)
+def test_rouge_score_accumulate_best(preds, references, expected_scores):
+    """Issue: https://github.com/Lightning-AI/torchmetrics/issues/2148."""
+    # Calculate ROUGE scores
+    result = rouge_score(preds, references, accumulate="best")
+
+    # Assert each expected score
+    for key in expected_scores:
+        assert torch.isclose(result[key], torch.tensor(expected_scores[key])), (
+            f"Expected {expected_scores[key]} for {key}, but got {result[key]}"
+        )

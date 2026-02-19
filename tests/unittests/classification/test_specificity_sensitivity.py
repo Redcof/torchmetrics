@@ -20,6 +20,7 @@ import torch
 from scipy.special import expit as sigmoid
 from scipy.special import softmax
 from sklearn.metrics import roc_curve as sk_roc_curve
+
 from torchmetrics.classification.specificity_sensitivity import (
     BinarySpecificityAtSensitivity,
     MulticlassSpecificityAtSensitivity,
@@ -33,7 +34,7 @@ from torchmetrics.functional.classification.specificity_sensitivity import (
     multilabel_specificity_at_sensitivity,
 )
 from torchmetrics.metric import Metric
-
+from torchmetrics.utilities.imports import _TORCH_GREATER_EQUAL_2_1
 from unittests import NUM_CLASSES
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester, inject_ignore_index, remove_ignore_index
@@ -81,7 +82,7 @@ def _reference_sklearn_specificity_at_sensitivity_binary(preds, target, min_sens
     return _specificity_at_sensitivity_x_multilabel(preds, target, min_sensitivity)
 
 
-@pytest.mark.parametrize("inputs", (_binary_cases[1], _binary_cases[2], _binary_cases[4], _binary_cases[5]))
+@pytest.mark.parametrize("inputs", [_binary_cases[1], _binary_cases[2], _binary_cases[4], _binary_cases[5]])
 class TestBinarySpecificityAtSensitivity(MetricTester):
     """Test class for `BinarySpecificityAtSensitivity` metric."""
 
@@ -148,8 +149,8 @@ class TestBinarySpecificityAtSensitivity(MetricTester):
     def test_binary_specificity_at_sensitivity_dtype_cpu(self, inputs, dtype):
         """Test dtype support of the metric on CPU."""
         preds, target = inputs
-        if (preds < 0).any() and dtype == torch.half:
-            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision")
+        if not _TORCH_GREATER_EQUAL_2_1 and (preds < 0).any() and dtype == torch.half:
+            pytest.xfail(reason="torch.sigmoid in metric does not support cpu + half precision for torch<2.1")
         self.run_precision_test_cpu(
             preds=preds,
             target=target,
@@ -205,7 +206,7 @@ def _reference_sklearn_specificity_at_sensitivity_multiclass(preds, target, min_
 
 
 @pytest.mark.parametrize(
-    "inputs", (_multiclass_cases[1], _multiclass_cases[2], _multiclass_cases[4], _multiclass_cases[5])
+    "inputs", [_multiclass_cases[1], _multiclass_cases[2], _multiclass_cases[4], _multiclass_cases[5]]
 )
 class TestMulticlassSpecificityAtSensitivity(MetricTester):
     """Test class for `MulticlassSpecificityAtSensitivity` metric."""
@@ -333,7 +334,7 @@ def _reference_sklearn_specificity_at_sensitivity_multilabel(preds, target, min_
 
 
 @pytest.mark.parametrize(
-    "inputs", (_multilabel_cases[1], _multilabel_cases[2], _multilabel_cases[4], _multilabel_cases[5])
+    "inputs", [_multilabel_cases[1], _multilabel_cases[2], _multilabel_cases[4], _multilabel_cases[5]]
 )
 class TestMultilabelSpecificityAtSensitivity(MetricTester):
     """Test class for `MultilabelSpecificityAtSensitivity` metric."""

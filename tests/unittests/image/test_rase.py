@@ -18,10 +18,10 @@ import pytest
 import sewar
 import torch
 from torch import Tensor
+
 from torchmetrics.functional import relative_average_spectral_error
 from torchmetrics.functional.image.utils import _uniform_filter
 from torchmetrics.image import RelativeAverageSpectralError
-
 from unittests import BATCH_SIZE
 from unittests._helpers.testers import MetricTester
 
@@ -70,7 +70,7 @@ def _reference_sewar_rase(preds, target, window_size):
     return torch.mean(rase_map[crop_slide:-crop_slide, crop_slide:-crop_slide])
 
 
-@pytest.mark.parametrize("preds, target, window_size", [(i.preds, i.target, i.window_size) for i in _inputs])
+@pytest.mark.parametrize(("preds", "target", "window_size"), [(i.preds, i.target, i.window_size) for i in _inputs])
 class TestRelativeAverageSpectralError(MetricTester):
     """Testing of Relative Average Spectral Error."""
 

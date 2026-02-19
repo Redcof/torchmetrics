@@ -17,9 +17,9 @@ from typing import Any
 import pytest
 import torch
 from kornia.losses import total_variation as kornia_total_variation
+
 from torchmetrics.functional.image.tv import total_variation
 from torchmetrics.image.tv import TotalVariation
-
 from unittests import _Input
 from unittests._helpers import seed_all
 from unittests._helpers.testers import MetricTester
@@ -65,7 +65,7 @@ for size, channel, dtype in [
 
 
 @pytest.mark.parametrize(
-    "preds, target",
+    ("preds", "target"),
     [(i.preds, i.target) for i in _inputs],
 )
 @pytest.mark.parametrize("reduction", ["sum", "mean", None])
