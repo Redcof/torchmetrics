@@ -463,4 +463,8 @@ linkcheck_ignore = [
     # Ignore Medium articles which return 403 to automated clients
     # Mean-Average-Precision (mAP) and Mean-Average-Recall (mAR)
     "https://jonathan-hui.medium.com/map-mean-average-precision-for-object-detection-45c121a31173",
+    # Character Error Rate (site under maintenance see links.rst)
+    "https://rechtsprechung-im-ostseeraum.archiv.uni-greifswald.de",
+    # Pearson's Contingency Coefficient (NIST dataplot server intermittently returns 504)
+    "https://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/pearcont.htm",
 ]
